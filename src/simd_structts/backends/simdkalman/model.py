@@ -30,13 +30,30 @@ class SIMDKalmanFilterResults:
     def _compute(self, horizon=0, exog=None):
         # TODO: optimize
         if horizon > 0 and exog is not None:
-            exog = np.vstack([self.exog, exog])
+
+            n_obs, _, k_comp = self.kf.observation_model.shape
+
+            n_exog, k_exog = exog.shape
+
+            # take last row of the design matrix and clone it n_exog times
+            design = np.repeat(self.kf.observation_model[-2:-1], n_exog, axis=0)
+            design[:, 0, k_comp - k_exog : k_comp] = exog
+
+            observation_model = np.vstack([self.kf.observation_model, design])
+
+            kf = EKalmanFilter(
+                state_transition=self.kf.state_transition,
+                observation_model=observation_model,
+                process_noise=self.kf.process_noise,
+                observation_noise=self.kf.observation_noise,
+            )
         else:
-            exog = self.exog
-        return self.kf.compute(
+            kf = self.kf
+
+        return kf.compute(
             self.endog,
             horizon,
-            exog=exog,
+            # exog=exog,
             filtered=True,
             smoothed=True,
             initial_value=self.initial_value,
@@ -338,17 +355,9 @@ class SIMDStructTS:
             #             if self.mle_regression:
             #                 self.parameters_obs_intercept['reg_coeff'] = self.k_exog
             #             else:
-            #             print(self.design.shape)
 
-            #             design = np.repeat(self.design[np.newaxis, :, :], self.nobs,
-            #                                axis=0)
-            # #             print(design.shape)
-
-            #             self.design = design.transpose()
-            # #             print(self.design.shape)
-
-            #             self.design[0, i:i+self.k_exog, :] = (
-            #                 self.exog.transpose())
+            self.design = np.repeat(self.design[np.newaxis, :, :], self.nobs, axis=0)
+            self.design[:, 0, i : i + self.k_exog] = self.exog
 
             self.transition[i : i + self.k_exog, i : i + self.k_exog] = np.eye(
                 self.k_exog

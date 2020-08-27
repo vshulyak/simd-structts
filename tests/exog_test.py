@@ -20,7 +20,7 @@ def test_exog(ts1ts2):
         level=True,
         stochastic_level=True,
         exog=exog_full[:-H, ...],
-        #                     seasonal=4,
+        # seasonal=4,
         #                     freq_seasonal=[{"period": 365.25, "harmonics": 2}],
         #                     autoregressive=1,
     )
@@ -29,9 +29,9 @@ def test_exog(ts1ts2):
     #     print(m)
     simd_r = simd_m.smooth()
 
-    simd_r.filtered_state.shape, simd_r.get_forecast(
-        horizon=H, exog=exog_predict
-    ).predicted_mean.shape
+    # simd_r.filtered_state.shape, simd_r.get_forecast(
+    #     horizon=H, exog=exog_predict
+    # ).predicted_mean.shape
 
     sm_m = MultiUnobservedComponents(
         ts1ts2,

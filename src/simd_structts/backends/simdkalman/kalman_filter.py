@@ -15,7 +15,7 @@ class EKalmanFilter(simdkalman.KalmanFilter):
         self,
         data,
         n_test,
-        exog=None,  # mod
+        # exog=None,  # mod
         initial_value=None,
         initial_covariance=None,
         smoothed=True,
@@ -29,12 +29,12 @@ class EKalmanFilter(simdkalman.KalmanFilter):
         verbose=False,
     ):
 
-        if exog is not None and n_test == 0:
-            assert data.shape[1] == exog.shape[0]
-        if exog is not None and n_test > 0:
-            assert data.shape[1] + n_test == exog.shape[0]
-        # TODO: fixme
-        self.exog = exog
+        # if exog is not None and n_test == 0:
+        #     assert data.shape[1] == exog.shape[0]
+        # if exog is not None and n_test > 0:
+        #     assert data.shape[1] + n_test == exog.shape[0]
+        # # TODO: fixme
+        # self.exog = exog
 
         # pylint: disable=W0201
         result = EKalmanFilter.Result()
@@ -247,7 +247,13 @@ class EKalmanFilter(simdkalman.KalmanFilter):
 
     def update(self, m, P, y, log_likelihood=False, j=None):
         assert j is not None
-        observation_model = np.array([[1.0, 0.0, self.exog[j, 0]]])
+        if self.observation_model.ndim == 3:
+            observation_model = self.observation_model[j]
+        elif self.observation_model.ndim == 2:
+            observation_model = self.observation_model
+        else:
+            raise
+        # observation_model = np.array([[1.0, 0.0, self.exog[j, 0]]])
         return priv_update_with_nan_check(
             m,
             P,
@@ -259,5 +265,11 @@ class EKalmanFilter(simdkalman.KalmanFilter):
 
     def predict_observation(self, m, P, j=None):
         assert j is not None
-        observation_model = np.array([[1.0, 0.0, self.exog[j, 0]]])
+        # observation_model = np.array([[1.0, 0.0, self.exog[j, 0]]])
+        if self.observation_model.ndim == 3:
+            observation_model = self.observation_model[j]
+        elif self.observation_model.ndim == 2:
+            observation_model = self.observation_model
+        else:
+            raise
         return predict_observation(m, P, observation_model, self.observation_noise)
