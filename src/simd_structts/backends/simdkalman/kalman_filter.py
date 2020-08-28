@@ -15,7 +15,6 @@ class EKalmanFilter(simdkalman.KalmanFilter):
         self,
         data,
         n_test,
-        # exog=None,  # mod
         initial_value=None,
         initial_covariance=None,
         smoothed=True,
