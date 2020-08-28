@@ -30,19 +30,19 @@ class SMResults:
 
     @property
     def filtered_state(self):
-        return np.stack([r.filtered_state.T for r in self.res]).squeeze()
+        return np.stack([r.filtered_state.T for r in self.res])
 
     @property
     def filtered_state_cov(self):
-        return np.stack([r.filtered_state_cov.T for r in self.res]).squeeze()
+        return np.stack([r.filtered_state_cov.T for r in self.res])
 
     @property
     def smoothed_state(self):
-        return np.stack([r.smoothed_state.T for r in self.res]).squeeze()
+        return np.stack([r.smoothed_state.T for r in self.res])
 
     @property
     def smoothed_state_cov(self):
-        return np.stack([r.smoothed_state_cov.T for r in self.res]).squeeze()
+        return np.stack([r.smoothed_state_cov.T for r in self.res])
 
     @property
     def smoothed_forecasts(self):
@@ -88,11 +88,11 @@ class MultiUnobservedComponents:
         if self.kwargs.get("seasonal", False):
             self.start_params += [1]
         if self.kwargs.get("freq_seasonal", False):
-            self.start_params += [1]
+            self.start_params += [1] * len(m.freq_seasonal_harmonics)
 
-        # TODO: k_exog
-        if self.exog is not None:
-            self.start_params += [1]
+        # # TODO: k_exog
+        # if self.exog is not None:
+        #     self.start_params += [1]
 
     #         self.start_params = [1,1,1,1]
 

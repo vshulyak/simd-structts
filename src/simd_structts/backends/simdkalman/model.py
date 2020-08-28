@@ -125,8 +125,11 @@ class SIMDStructTS:
         assert irregular is False
 
         assert exog is None or exog.ndim == 2
+        assert (
+            mle_regression is False
+        ), "MLE is not supported for estimating params currently"
 
-        self.mle_regression = False
+        self.mle_regression = mle_regression
 
         # Model options
         self.level = level
@@ -164,15 +167,11 @@ class SIMDStructTS:
             self.stochastic_freq_seasonal = stochastic_freq_seasonal
         self.stochastic_cycle = stochastic_cycle
 
-        # correct?
         self.nobs = endog.shape[1]
 
         # Exogenous component
-        #         (self.k_exog, exog) = prepare_exog(exog)
         self.k_exog = exog.shape[1] if exog is not None else 0
         self.exog = exog
-        #         print("e1", self.exog)
-        #         self.k_exog = 0
 
         self.regression = self.k_exog > 0
 
@@ -193,6 +192,7 @@ class SIMDStructTS:
             + (not self.mle_regression) * self.k_exog
         )
 
+        # initial SSM matrices
         self.transition = np.zeros((k_states, k_states))
         self.design = np.zeros((1, k_states))
         self.state_cov = np.zeros((k_states, k_states))
@@ -344,18 +344,15 @@ class SIMDStructTS:
                     self.transition[trans_s, trans_s] = trans
                     t += 2
 
-                    #                 if self.stochastic_freq_seasonal[ix]:
-                    #                     self.selection[i:i + n, j:j + n] = np.eye(n)
-                    #                     cov_key = 'freq_seasonal_var_{!r}'.format(ix)
-                    #                     self.parameters_state_cov[cov_key] = 1
+                    # freq_seasonal is always stochastic
+
                     j += n
                 i += n
 
+        # exog regression
         if self.regression:
-            #             if self.mle_regression:
-            #                 self.parameters_obs_intercept['reg_coeff'] = self.k_exog
-            #             else:
 
+            # add exog to the design matrix (3d matrices are a special case in our KF)
             self.design = np.repeat(self.design[np.newaxis, :, :], self.nobs, axis=0)
             self.design[:, 0, i : i + self.k_exog] = self.exog
 
@@ -364,9 +361,3 @@ class SIMDStructTS:
             )
 
             i += self.k_exog
-
-
-#         self.transition = np.ones((2, 2))
-#         self.design = np.ones((3,1, 2))
-#         self.state_cov = np.random.random((2, 2))
-#         self.obs_cov = np.ones((1,1))

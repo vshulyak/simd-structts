@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def assert_models_equal(m1, m2, h, exog_predict):
+def assert_models_equal(m1, m2, h, exog_predict=None):
     assert np.allclose(m1.filtered_state, m2.filtered_state)
     assert np.allclose(m1.filtered_state_cov, m2.filtered_state_cov)
     assert np.allclose(m1.smoothed_state, m2.smoothed_state)
