@@ -62,13 +62,7 @@ class MultiUnobservedComponents:
         self.models = []
 
         for i in range(self.n_models):
-            #             print(endog[i,...].shape, exog.shape)
             m = UnobservedComponents(endog[i, ...], exog=exog, **kwargs)
-            #             m['obs_cov', 0, 0] = 4
-            #             m.ssm.initialization.set(index=None,
-            #                                      initialization_type='known',
-            #                                      constant=np.array([ 18.,   5., -12.,  -8.]),
-            #                                      stationary_cov=np.eye(4))
             self.models += [m]
 
     def initialize_fixed(self):
@@ -90,14 +84,7 @@ class MultiUnobservedComponents:
         if self.kwargs.get("freq_seasonal", False):
             self.start_params += [1] * len(m.freq_seasonal_harmonics)
 
-        # # TODO: k_exog
-        # if self.exog is not None:
-        #     self.start_params += [1]
-
-    #         self.start_params = [1,1,1,1]
-
     def smooth(self):
-        #         start_params = [1,1]
 
         res = []
         for i in range(self.n_models):
