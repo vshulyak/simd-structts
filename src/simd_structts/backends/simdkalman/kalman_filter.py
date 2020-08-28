@@ -29,13 +29,6 @@ class EKalmanFilter(simdkalman.KalmanFilter):
         verbose=False,
     ):
 
-        # if exog is not None and n_test == 0:
-        #     assert data.shape[1] == exog.shape[0]
-        # if exog is not None and n_test > 0:
-        #     assert data.shape[1] + n_test == exog.shape[0]
-        # # TODO: fixme
-        # self.exog = exog
-
         # pylint: disable=W0201
         result = EKalmanFilter.Result()
 
@@ -117,7 +110,7 @@ class EKalmanFilter(simdkalman.KalmanFilter):
 
             y = data[:, j, ...].reshape((n_vars, n_obs, 1))
 
-            tup = self.update(m, P, y, log_likelihood, j=j)
+            tup = self.update(m, P, y, j, log_likelihood)
             m, P, K = tup[:3]
             if log_likelihood:
                 l = tup[-1]
@@ -127,7 +120,7 @@ class EKalmanFilter(simdkalman.KalmanFilter):
 
             if keep_filtered:
                 if observations:
-                    obs_mean, obs_cov = self.predict_observation(m, P, j=j)
+                    obs_mean, obs_cov = self.predict_observation(m, P, j)
                     filtered_observations.mean[:, j, :] = obs_mean[..., 0]
                     if covariances:
                         filtered_observations.cov[:, j, :, :] = obs_cov
@@ -182,7 +175,7 @@ class EKalmanFilter(simdkalman.KalmanFilter):
                         result.smoothed.states.cov[:, j, :, :] = Ps
 
                 if observations:
-                    obs_mean, obs_cov = self.predict_observation(ms, Ps, j=j)
+                    obs_mean, obs_cov = self.predict_observation(ms, Ps, j)
                     result.smoothed.observations.mean[:, j, :] = obs_mean[..., 0]
                     if covariances:
                         result.smoothed.observations.cov[:, j, :, :] = obs_cov
@@ -245,15 +238,20 @@ class EKalmanFilter(simdkalman.KalmanFilter):
 
         return result
 
-    def update(self, m, P, y, log_likelihood=False, j=None):
-        assert j is not None
+    def update(self, m, P, y, j, log_likelihood=False):
+        """
+        Update KF – with design matrix exog handling for every step
+        """
+        assert j is not None, "step has to be provided"
+
+        # modify design matrix in case we're dealing with exog variables
         if self.observation_model.ndim == 3:
             observation_model = self.observation_model[j]
         elif self.observation_model.ndim == 2:
             observation_model = self.observation_model
         else:
             raise
-        # observation_model = np.array([[1.0, 0.0, self.exog[j, 0]]])
+
         return priv_update_with_nan_check(
             m,
             P,
@@ -263,13 +261,18 @@ class EKalmanFilter(simdkalman.KalmanFilter):
             log_likelihood=log_likelihood,
         )
 
-    def predict_observation(self, m, P, j=None):
-        assert j is not None
-        # observation_model = np.array([[1.0, 0.0, self.exog[j, 0]]])
+    def predict_observation(self, m, P, j):
+        """
+        Predict KF – with design matrix exog handling for every step
+        """
+        assert j is not None, "step has to be provided"
+
+        # modify design matrix in case we're dealing with exog variables
         if self.observation_model.ndim == 3:
             observation_model = self.observation_model[j]
         elif self.observation_model.ndim == 2:
             observation_model = self.observation_model
         else:
             raise
+
         return predict_observation(m, P, observation_model, self.observation_noise)
