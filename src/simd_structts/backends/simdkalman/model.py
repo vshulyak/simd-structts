@@ -167,6 +167,7 @@ class SIMDStructTS:
             self.stochastic_freq_seasonal = stochastic_freq_seasonal
         self.stochastic_cycle = stochastic_cycle
 
+        self.k_series = endog.shape[0]
         self.nobs = endog.shape[1]
 
         # Exogenous component
@@ -195,7 +196,7 @@ class SIMDStructTS:
         # initial SSM matrices
         self.transition = np.zeros((k_states, k_states))
         self.design = np.zeros((1, k_states))
-        self.state_cov = np.zeros((k_states, k_states))
+        self.state_cov = np.zeros((self.k_series, k_states, k_states))
         self.obs_cov = np.array([[0.0]])
 
         self.initial_value = np.ones(k_states)
@@ -205,6 +206,37 @@ class SIMDStructTS:
 
     def initialize_fixed(self):
 
+        for series_idx in range(self.k_series):
+
+            offset = 0
+
+            # level
+            self.state_cov[series_idx, offset, offset] = 1
+
+            # trend
+            if self.trend:
+                offset += 1
+                self.state_cov[series_idx, offset, offset] = 1
+
+            # seasonal
+            if self.seasonal:
+                offset += 1
+                self.state_cov[series_idx, offset, offset] = 1
+
+                # account for added seasonal components
+                offset += self._k_seasonal_states - 1
+
+            # freq_seasonal
+            for _ in range(self._k_freq_seas_states):
+                offset += 1
+                self.state_cov[series_idx, offset, offset] = 1
+
+        self.obs_cov[0, 0] = 0
+        self.initial_value = np.zeros(self.k_states)
+        self.initial_covariance = np.eye(self.k_states)
+
+    def initialize_approx_diffuse(self):
+
         #         sigma_epsilon = 2.0 # affects the measurement error
         #         sigma_xi = 1.0 # affects the local level
         #         sigma_omega = 1.0 # affects the seasonality
@@ -212,32 +244,78 @@ class SIMDStructTS:
         #         self.state_cov[1,1] = sigma_omega ** 2
         #         self.obs_cov[0,0] = sigma_epsilon ** 2
 
-        offset = 0
+        from statsmodels.tsa.filters.hp_filter import hpfilter
 
-        # level
-        self.state_cov[offset, offset] = 1
+        # Eliminate missing data to estimate starting parameters
+        endog = self.endog
+        exog = self.exog
+        if np.any(np.isnan(endog)):
+            mask = ~np.isnan(endog).squeeze()
+            endog = endog[mask]
+            if exog is not None:
+                exog = exog[mask]
 
-        # trend
-        if self.trend:
-            offset += 1
-            self.state_cov[offset, offset] = 1
+        for series_idx in range(self.k_series):
 
-        # seasonal
-        if self.seasonal:
-            offset += 1
-            self.state_cov[offset, offset] = 1
+            # Level / trend variances
+            # (Use the HP filter to get initial estimates of variances)
+            _start_params = {}
 
-            # account for added seasonal components
-            offset += self._k_seasonal_states - 1
+            resid, trend1 = hpfilter(endog[series_idx, :])
 
-        # freq_seasonal
-        for _ in range(self._k_freq_seas_states):
-            offset += 1
-            self.state_cov[offset, offset] = 1
+            if self.stochastic_trend:
+                cycle2, trend2 = hpfilter(trend1)
+                _start_params["trend_var"] = np.std(trend2) ** 2
+                if self.stochastic_level:
+                    _start_params["level_var"] = np.std(cycle2) ** 2
+            elif self.stochastic_level:
+                _start_params["level_var"] = np.std(trend1) ** 2
+
+            # The variance of the residual term can be used for all variances,
+            # just to get something in the right order of magnitude.
+            var_resid = np.var(resid)
+
+            # Seasonal
+            if self.stochastic_seasonal:
+                _start_params["seasonal_var"] = var_resid
+
+            # Frequency domain seasonal
+            if self.stochastic_freq_seasonal:
+                _start_params["freq_seasonal_var"] = var_resid
+
+            offset = 0
+
+            # level
+            self.state_cov[series_idx, offset, offset] = _start_params["level_var"]
+
+            # trend
+            if self.trend:
+                offset += 1
+                self.state_cov[series_idx, offset, offset] = _start_params["trend_var"]
+
+            # seasonal
+            if self.seasonal:
+                offset += 1
+                self.state_cov[series_idx, offset, offset] = _start_params[
+                    "seasonal_var"
+                ]
+
+                # account for added seasonal components
+                offset += self._k_seasonal_states - 1
+
+            # freq_seasonal
+            for _ in range(self._k_freq_seas_states):
+                offset += 1
+                self.state_cov[series_idx, offset, offset] = _start_params[
+                    "freq_seasonal_var"
+                ]
 
         self.obs_cov[0, 0] = 0
         self.initial_value = np.zeros(self.k_states)
         self.initial_covariance = np.eye(self.k_states)
+
+        # self.state_cov = [self.state_cov, self.state_cov]
+        # self.obs_cov = [self.obs_cov, self.obs_cov]
 
     def smooth(self):
         kf = EKalmanFilter(

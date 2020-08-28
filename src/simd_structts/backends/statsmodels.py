@@ -66,6 +66,7 @@ class MultiUnobservedComponents:
             self.models += [m]
 
     def initialize_fixed(self):
+        self.start_params = []
         for m in self.models:
             m["obs_cov", 0, 0] = 0
             dims = m.ssm.transition[:, :, 0].shape[0]
@@ -75,14 +76,29 @@ class MultiUnobservedComponents:
                 constant=np.zeros(dims),
                 stationary_cov=np.eye(dims),
             )
-        self.start_params = [1]
+            params = [1]
 
-        if self.kwargs.get("trend", False):
-            self.start_params += [1]
-        if self.kwargs.get("seasonal", False):
-            self.start_params += [1]
-        if self.kwargs.get("freq_seasonal", False):
-            self.start_params += [1] * len(m.freq_seasonal_harmonics)
+            if self.kwargs.get("trend", False):
+                params += [1]
+            if self.kwargs.get("seasonal", False):
+                params += [1]
+            if self.kwargs.get("freq_seasonal", False):
+                params += [1] * len(m.freq_seasonal_harmonics)
+
+            self.start_params += [params]
+
+    def initialize_approx_diffuse(self):
+        self.start_params = []
+        for m in self.models:
+            m["obs_cov", 0, 0] = 0
+            dims = m.ssm.transition[:, :, 0].shape[0]
+            m.ssm.initialization.set(
+                index=None,
+                initialization_type="known",
+                constant=np.zeros(dims),
+                stationary_cov=np.eye(dims),
+            )
+            self.start_params += [m.start_params]
 
     def smooth(self):
 
@@ -90,7 +106,7 @@ class MultiUnobservedComponents:
         for i in range(self.n_models):
             res += [
                 self.models[i].smooth(
-                    self.start_params,
+                    self.start_params[i],
                     transformed=True,
                     includes_fixed=False,
                     cov_type=None,
