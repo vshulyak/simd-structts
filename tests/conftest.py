@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
-
+np.random.seed(0)
 
 def seasonality(n, s_len=24):
     freq = n / s_len

@@ -53,7 +53,6 @@ class SIMDKalmanFilterResults:
         return kf.compute(
             self.endog,
             horizon,
-            # exog=exog,
             filtered=True,
             smoothed=True,
             initial_value=self.initial_value,
@@ -67,7 +66,7 @@ class SIMDKalmanFilterResults:
         """
         return SIMDKalmanPredictionResults(
             self._compute(horizon=horizon, exog=exog).predicted
-        )  # .observations.mean
+        )
 
     @property
     def filtered_state(self):
@@ -312,7 +311,7 @@ class SIMDStructTS:
 
         self.obs_cov[0, 0] = 0
         self.initial_value = np.zeros(self.k_states)
-        self.initial_covariance = np.eye(self.k_states)
+        self.initial_covariance = np.eye(self.k_states) * 1e6
 
         # self.state_cov = [self.state_cov, self.state_cov]
         # self.obs_cov = [self.obs_cov, self.obs_cov]

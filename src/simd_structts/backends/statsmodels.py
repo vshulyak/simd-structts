@@ -92,12 +92,14 @@ class MultiUnobservedComponents:
         for m in self.models:
             m["obs_cov", 0, 0] = 0
             dims = m.ssm.transition[:, :, 0].shape[0]
+
             m.ssm.initialization.set(
                 index=None,
                 initialization_type="known",
                 constant=np.zeros(dims),
-                stationary_cov=np.eye(dims),
+                stationary_cov=np.eye(dims) * 1e6,
             )
+
             self.start_params += [m.start_params]
 
     def smooth(self):
