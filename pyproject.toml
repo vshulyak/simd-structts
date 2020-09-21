@@ -5,12 +5,12 @@ include = '\.pyi?$'
 
 [tool.poetry]
 name = "simd_structts"
-version = "0.1.0"
+version = "0.1.1"
 description = "SIMD implementation of the StructTS/Unobserved Components model"
 authors = ["Vladimir Shulyak"]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "3.*"
 statsmodels = "^0.11.1"
 simdkalman = "1.0.1"
 
