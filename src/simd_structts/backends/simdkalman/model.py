@@ -245,22 +245,23 @@ class SIMDStructTS:
 
         from statsmodels.tsa.filters.hp_filter import hpfilter
 
-        # Eliminate missing data to estimate starting parameters
-        endog = self.endog
-        exog = self.exog
-        if np.any(np.isnan(endog)):
-            mask = ~np.isnan(endog).squeeze()
-            endog = endog[mask]
-            if exog is not None:
-                exog = exog[mask]
-
         for series_idx in range(self.k_series):
+
+            # Eliminate missing data to estimate starting parameters
+            endog = self.endog[series_idx, :]
+            exog = self.exog
+            if np.any(np.isnan(endog)):
+                mask = ~np.isnan(endog).squeeze()
+                endog = endog[mask]
+                if exog is not None:
+                    # WARN: currently unused
+                    exog = exog[mask]
 
             # Level / trend variances
             # (Use the HP filter to get initial estimates of variances)
             _start_params = {}
 
-            resid, trend1 = hpfilter(endog[series_idx, :])
+            resid, trend1 = hpfilter(endog)
 
             if self.stochastic_trend:
                 cycle2, trend2 = hpfilter(trend1)
