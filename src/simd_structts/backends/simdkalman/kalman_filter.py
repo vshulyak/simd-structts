@@ -23,11 +23,10 @@ class EKalmanFilter(simdkalman.KalmanFilter):
         covariances=True,
         observations=True,
         likelihoods=False,
-        gains=False,
+        gains=True, # False,
         log_likelihood=False,
         verbose=False,
     ):
-
         # pylint: disable=W0201
         result = EKalmanFilter.Result()
 
@@ -103,6 +102,11 @@ class EKalmanFilter(simdkalman.KalmanFilter):
         if gains:
             result.filtered.gains = np.empty((n_vars, n_measurements, n_states, n_obs))
 
+
+        # TODO: fixme / save to result
+        self.ms = [m]
+        self.Ps = [P]
+
         for j in range(n_measurements):
             if verbose:
                 print("filtering %d/%d" % (j + 1, n_measurements))
@@ -131,6 +135,17 @@ class EKalmanFilter(simdkalman.KalmanFilter):
                 result.filtered.gains[:, j, :, :] = K
 
             m, P = self.predict_next(m, P)
+
+            # TODO: fixme / save to result
+            self.ms += [m]
+            self.Ps += [P]
+
+        # TODO: fixme / save to result
+        self.ms = np.swapaxes(np.stack(self.ms), 0, 1)[:,:,:,0]
+        self.Ps = np.swapaxes(np.stack(self.Ps), 0, 1)
+
+        self.filtered_observations_mean = 1*filtered_observations.mean
+        self.filtered_observations_cov = 1*filtered_observations.cov
 
         if smoothed:
             result.smoothed = EKalmanFilter.Result()

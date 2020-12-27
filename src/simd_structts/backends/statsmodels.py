@@ -50,6 +50,14 @@ class SMResults:
             [r.filter_results.smoothed_forecasts.T for r in self.res]
         ).squeeze()
 
+    @property
+    def predicted_state(self):
+        return np.stack([r.predicted_state.T for r in self.res])
+
+    @property
+    def predicted_state_cov(self):
+        return np.stack([r.predicted_state_cov.T for r in self.res])
+
 
 class MultiUnobservedComponents:
     def __init__(self, endog, **kwargs):
@@ -65,16 +73,16 @@ class MultiUnobservedComponents:
             m = UnobservedComponents(endog[i, ...], exog=exog, **kwargs)
             self.models += [m]
 
-    def initialize_fixed(self):
+    def initialize_fixed(self, obs_cov=0, initial_state_cov=1e6):
         self.start_params = []
         for m in self.models:
-            m["obs_cov", 0, 0] = 0
+            m["obs_cov", 0, 0] = obs_cov
             dims = m.ssm.transition[:, :, 0].shape[0]
             m.ssm.initialization.set(
                 index=None,
                 initialization_type="known",
                 constant=np.zeros(dims),
-                stationary_cov=np.eye(dims),
+                stationary_cov=np.eye(dims) * initial_state_cov,
             )
             params = [1]
 
@@ -87,17 +95,17 @@ class MultiUnobservedComponents:
 
             self.start_params += [params]
 
-    def initialize_approx_diffuse(self):
+    def initialize_approx_diffuse(self, obs_cov=0, initial_state_cov=1e6):
         self.start_params = []
         for m in self.models:
-            m["obs_cov", 0, 0] = 0
+            m["obs_cov", 0, 0] = obs_cov
             dims = m.ssm.transition[:, :, 0].shape[0]
 
             m.ssm.initialization.set(
                 index=None,
                 initialization_type="known",
                 constant=np.zeros(dims),
-                stationary_cov=np.eye(dims) * 1e6,
+                stationary_cov=np.eye(dims) * initial_state_cov
             )
 
             self.start_params += [m.start_params]

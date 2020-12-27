@@ -41,16 +41,23 @@ class SIMDKalmanFilterResults:
 
             observation_model = np.vstack([self.kf.observation_model, design])
 
-            kf = EKalmanFilter(
+            self.kf = kf = EKalmanFilter(
                 state_transition=self.kf.state_transition,
                 observation_model=observation_model,
                 process_noise=self.kf.process_noise,
                 observation_noise=self.kf.observation_noise,
             )
         else:
-            kf = self.kf
+            # FIXME: debug
+            # kf = self.kf
+            self.kf = kf = EKalmanFilter(
+                state_transition=self.kf.state_transition,
+                observation_model=self.kf.observation_model,
+                process_noise=self.kf.process_noise,
+                observation_noise=self.kf.observation_noise,
+            )
 
-        return kf.compute(
+        return self.kf.compute(
             self.endog,
             horizon,
             filtered=True,
@@ -87,6 +94,16 @@ class SIMDKalmanFilterResults:
     @property
     def smoothed_forecasts(self):
         return self._compute().smoothed.observations.mean
+
+    @property
+    def predicted_state(self):
+        # TODO: compute is broken
+        return self.kf.ms
+
+    @property
+    def predicted_state_cov(self):
+        # TODO: compute is broken
+        return self.kf.Ps
 
 
 class SIMDStructTS:
@@ -203,7 +220,7 @@ class SIMDStructTS:
 
         self.setup()
 
-    def initialize_fixed(self):
+    def initialize_fixed(self, obs_cov=0, initial_state_cov=1e6):
 
         for series_idx in range(self.k_series):
 
@@ -230,11 +247,11 @@ class SIMDStructTS:
                 offset += 1
                 self.state_cov[series_idx, offset, offset] = 1
 
-        self.obs_cov[0, 0] = 0
+        self.obs_cov[0, 0] = obs_cov
         self.initial_value = np.zeros(self.k_states)
-        self.initial_covariance = np.eye(self.k_states)
+        self.initial_covariance = np.eye(self.k_states) * initial_state_cov
 
-    def initialize_approx_diffuse(self):
+    def initialize_approx_diffuse(self, obs_cov=0, initial_state_cov=1e6):
 
         #         sigma_epsilon = 2.0 # affects the measurement error
         #         sigma_xi = 1.0 # affects the local level
@@ -310,9 +327,9 @@ class SIMDStructTS:
                     "freq_seasonal_var"
                 ]
 
-        self.obs_cov[0, 0] = 0
+        self.obs_cov[0, 0] = obs_cov
         self.initial_value = np.zeros(self.k_states)
-        self.initial_covariance = np.eye(self.k_states) * 1e6
+        self.initial_covariance = np.eye(self.k_states) * initial_state_cov
 
         # self.state_cov = [self.state_cov, self.state_cov]
         # self.obs_cov = [self.obs_cov, self.obs_cov]
