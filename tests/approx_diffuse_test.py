@@ -1,8 +1,15 @@
 import numpy as np
 import pytest
 
+from hypothesis import given
+from hypothesis import strategies as st
+# from hypothesis.strategies import floats
+from hypothesis.extra.numpy import arrays
+
 from simd_structts.backends.simdkalman.model import SIMDStructTS
 from simd_structts.backends.statsmodels import MultiUnobservedComponents
+
+
 
 from .utils import assert_models_equal
 
@@ -10,6 +17,13 @@ N = 366
 H = 30
 EXOG_SINGLE_TUPLE = (np.random.random((N, 1)), np.random.random((H, 1)))
 EXOG_DOUBLE_TUPLE = (np.random.random((N, 2)), np.random.random((H, 2)))
+
+
+# @given(arrays(np.float, N, elements=st.floats(0, 1)),
+#        arrays(np.float, (N+H, 1), elements=st.floats(0, 1)))
+# def test_test(ts, exog):
+#     import pdb; pdb.set_trace()
+#     pass
 
 
 @pytest.mark.parametrize("trend", [True, False])

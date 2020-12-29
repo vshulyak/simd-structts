@@ -66,7 +66,7 @@ _statespace = namedtuple('statespace', 'initial_state initial_state_cov')
 _properties = [
     'model',
     'filter_method', 'inversion_method', 'stability_method', 'conserve_memory',
-    'tolerance', 'loglikelihood_burn', 'converged', 'period_converged',
+    'tolerance', 'converged', 'period_converged',
     'filtered_state', 'filtered_state_cov', 'predicted_state',
     'predicted_state_cov', 'forecast', 'forecast_error', 'forecast_error_cov',
     'loglikelihood'
@@ -74,7 +74,7 @@ _properties = [
 _kalman_filter = namedtuple('kalman_filter', ' '.join(_properties))
 
 
-def kalman_filter(model, return_loglike=False):
+def kalman_filter(model, initial_value, initial_covariance, return_loglike=False):
     # Parameters
     dtype = model.dtype
 
@@ -84,7 +84,7 @@ def kalman_filter(model, return_loglike=False):
     stability_method = model.stability_method
     conserve_memory = model.conserve_memory
     tolerance = model.tolerance
-    loglikelihood_burn = model.loglikelihood_burn
+    # loglikelihood_burn = model.loglikelihood_burn
 
     # Check for acceptable values
     if not filter_method == FILTER_CONVENTIONAL:
@@ -106,7 +106,7 @@ def kalman_filter(model, return_loglike=False):
     nobs = model.nobs
     k_endog = model.k_endog
     k_states = model.k_states
-    k_posdef = model.k_posdef
+    # k_posdef = model.k_posdef
 
     # Allocate memory for variables
     filtered_state = np.zeros((k_states, nobs), dtype=dtype)
@@ -144,9 +144,8 @@ def kalman_filter(model, return_loglike=False):
     #     )
     # else:
     #     raise RuntimeError('Statespace model not initialized.')
-    initial_state = np.zeros(k_states)
-    initial_state_cov = np.eye(k_states) * 1e4 #* 1e6
-
+    initial_state = initial_value # np.zeros(k_states)
+    initial_state_cov = initial_covariance #np.eye(k_states) * initial_state_cov_value
 
 
     # Copy initial values to predicted
