@@ -43,6 +43,10 @@ EXOG_DOUBLE_TUPLE = (np.random.random((N, 2)), np.random.random((H, 2)))
 def test_permute_params(
     ts1ts2, trend, seasonal, freq_seasonal, exog_train, exog_predict
 ):
+
+    # NANs
+    ts1ts2[:,10:20] = np.nan
+
     kwargs = dict(
         level=True,
         stochastic_level=True,

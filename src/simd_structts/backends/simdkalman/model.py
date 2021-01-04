@@ -62,6 +62,8 @@ class SIMDKalmanFilterResults:
             horizon,
             filtered=True,
             smoothed=True,
+            likelihoods=True,  # slower
+            log_likelihood=True,  # slower
             initial_value=self.initial_value,
             initial_covariance=self.initial_covariance,
         )

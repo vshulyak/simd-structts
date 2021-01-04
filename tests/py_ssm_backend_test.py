@@ -6,6 +6,7 @@ from hypothesis import strategies as st
 # from hypothesis.strategies import floats
 from hypothesis.extra.numpy import arrays
 
+from simd_structts.backends.simdkalman.model import SIMDStructTS
 from simd_structts.backends.py_ssm.model import PySSMStructTS
 from simd_structts.backends.statsmodels import MultiUnobservedComponents
 
@@ -17,23 +18,40 @@ EXOG_SINGLE_TUPLE = (np.random.random((N, 1)), np.random.random((H, 1)))
 EXOG_DOUBLE_TUPLE = (np.random.random((N, 2)), np.random.random((H, 2)))
 
 
-@pytest.mark.parametrize("trend", [True, ]) # False
-@pytest.mark.parametrize("seasonal", [None])  # , 2, 7
+# @pytest.mark.parametrize("trend", [True, ]) # False
+# @pytest.mark.parametrize("seasonal", [None])  # , 2, 7
+# @pytest.mark.parametrize(
+#     "freq_seasonal",
+#     [
+#         None,
+#         # [{"period": 365.25 * 2, "harmonics": 1}],
+#         # [{"period": 365.25, "harmonics": 3}],
+#         # [{"period": 365.25 / 2, "harmonics": 2}, {"period": 365.25, "harmonics": 1}],
+#     ],
+# )
+# @pytest.mark.parametrize(
+#     "exog_train,exog_predict", [EXOG_DOUBLE_TUPLE]  # (None, None), EXOG_SINGLE_TUPLE ,EXOG_DOUBLE_TUPLE
+# )
+@pytest.mark.parametrize("trend", [True, False]) #
+@pytest.mark.parametrize("seasonal", [None, 2, 7])  #
 @pytest.mark.parametrize(
     "freq_seasonal",
     [
         None,
-        # [{"period": 365.25 * 2, "harmonics": 1}],
-        # [{"period": 365.25, "harmonics": 3}],
-        # [{"period": 365.25 / 2, "harmonics": 2}, {"period": 365.25, "harmonics": 1}],
+        [{"period": 365.25 * 2, "harmonics": 1}],
+        [{"period": 365.25, "harmonics": 3}],
+        [{"period": 365.25 / 2, "harmonics": 2}, {"period": 365.25, "harmonics": 1}],
     ],
 )
 @pytest.mark.parametrize(
-    "exog_train,exog_predict", [(None, None)]  # , EXOG_SINGLE_TUPLE, EXOG_DOUBLE_TUPLE
+    "exog_train,exog_predict", [(None, None), EXOG_SINGLE_TUPLE, EXOG_DOUBLE_TUPLE]  #
 )
 def test_permute_params(
     ts1ts2, trend, seasonal, freq_seasonal, exog_train, exog_predict
 ):
+    # NANs
+    ts1ts2[:,10:20] = np.nan
+
     kwargs = dict(
         level=True,
         stochastic_level=True,
@@ -45,31 +63,54 @@ def test_permute_params(
         mle_regression=False,  # MLE is always false
     )
 
-    sm_m = MultiUnobservedComponents(ts1ts2, **kwargs)
+    from statsmodels.tsa.statespace.kalman_filter import FILTER_UNIVARIATE, FILTER_CONVENTIONAL
+    from statsmodels.tsa.statespace.kalman_smoother import SMOOTH_CONVENTIONAL, SMOOTH_CLASSICAL, SMOOTH_ALTERNATIVE, SMOOTH_UNIVARIATE
+
+
+    sm_m = MultiUnobservedComponents(ts1ts2, **{**kwargs, **dict(filter_method=FILTER_CONVENTIONAL, smooth_method=SMOOTH_CONVENTIONAL)})
+    # sm_m = MultiUnobservedComponents(ts1ts2, **{**kwargs, **dict(filter_method=FILTER_UNIVARIATE, smooth_method=SMOOTH_UNIVARIATE)})
+    # sm_m = MultiUnobservedComponents(ts1ts2, **kwargs)
     sm_m.initialize_approx_diffuse(obs_cov=1e-1, initial_state_cov=1e3)
     sm_r = sm_m.smooth()
+
+    # TEMP
+    simd_m = SIMDStructTS(ts1ts2, **kwargs)
+    simd_m.initialize_approx_diffuse(obs_cov=1e-1, initial_state_cov=1e3)
+    simd_r = simd_m.smooth()
 
     pyssm_m = PySSMStructTS(ts1ts2, **kwargs)
     pyssm_m.initialize_approx_diffuse(obs_cov=1e-1, initial_state_cov=1e3)
     pyssm_smoother = pyssm_m.smooth(sm_m.models[0].ssm, sm_r.res[0])
-    pyssm_filter = pyssm_m.kfilter
 
-    # pyssm_r = pyssm_m.filter(sm_m.models[0].ssm)
 
     def assert_models_equal(m1, m2, h, exog_predict=None):
         assert np.allclose(m1.filtered_state, m2.filtered_state)
         assert np.allclose(m1.filtered_state_cov, m2.filtered_state_cov)
         assert np.allclose(m1.predicted_state, m2.predicted_state)
         assert np.allclose(m1.predicted_state_cov, m2.predicted_state_cov)
-        assert np.allclose(m1.forecast_error, m2.forecasts_error)
+        assert np.allclose(m1.forecast_error, m2.forecasts_error, equal_nan=True)
         assert np.allclose(m1.forecast_error_cov, m2.forecasts_error_cov)
+        assert np.allclose(m1.loglikelihood, m2.llf_obs)
 
-    assert_models_equal(pyssm_filter, sm_r.res[0], h=H, exog_predict=exog_predict)
+        # TODO: llf + llf_obs
+        # TODO: forecast
+
+    assert_models_equal(pyssm_smoother, sm_r.res[0], h=H, exog_predict=exog_predict)
+
+
+    h = 30
+    preds = pyssm_m.forecast(h, exog=exog_predict)
+    preds_sm = sm_r.res[0].get_forecast(h, exog=exog_predict)
+
+    assert np.allclose(preds.predicted_mean, preds_sm.predicted_mean)
+    assert np.allclose(preds.se_mean, preds_sm.se_mean)
 
 
     def assert_model_smoother_equal(m1, m2, h, exog_predict=None):
         assert np.allclose(m1.smoothed_state, m2.smoothed_state)
         assert np.allclose(m1.smoothed_state_cov, m2.smoothed_state_cov)
-        # assert np.allclose(m1.smoothed_forecasts, m2.smoothed_forecasts)
+        assert np.allclose(m1.smoothed_forecasts, m2.smoother_results.smoothed_forecasts)
+        # assert np.allclose(m1.smoothed_forecasts_error, m2.smoother_results.smoothed_forecasts_error)
+        # assert np.allclose(m1.smoothed_forecasts_error_cov, m2.smoother_results.smoothed_forecasts_error_cov)
 
     assert_model_smoother_equal(pyssm_smoother, sm_r.res[0], h=H, exog_predict=exog_predict)

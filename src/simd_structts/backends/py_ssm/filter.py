@@ -116,7 +116,7 @@ def kalman_filter(model, initial_value, initial_covariance, return_loglike=False
     forecast = np.zeros((k_endog, nobs), dtype=dtype)
     forecast_error = np.zeros((k_endog, nobs), dtype=dtype)
     forecast_error_cov = np.zeros((k_endog, k_endog, nobs), dtype=dtype)
-    loglikelihood = np.zeros((nobs+1,), dtype=dtype)
+    loglikelihood = np.zeros((nobs,), dtype=dtype)
 
     # Selected state covariance matrix
     selected_state_cov = (
@@ -163,11 +163,13 @@ def kalman_filter(model, initial_value, initial_covariance, return_loglike=False
     state_cov_t = 0
 
     # Iterate forwards
+    # time invariant is only false when exog features are used
     time_invariant = model.time_invariant
 
-    # time invariant is only false when exog features are used
-    # if not time_invariant:
-    #     raise Exception("testing if this can be false")
+
+    # VS mod
+    missing = np.isnan(model.obs).astype(np.int32)  # same dim as endog
+    nmissing = missing.sum(axis=0)  # (nobs) shape, sum of all missing accross missing axis
 
     for t in range(nobs):
         # Get indices for possibly time-varying arrays
@@ -190,83 +192,111 @@ def kalman_filter(model, initial_value, initial_covariance, return_loglike=False
                 )
             )
 
-        # #### Forecast for time t
-        # `forecast` $= Z_t a_t + d_t$
-        #
-        # *Note*: $a_t$ is given from the initialization (for $t = 0$) or
-        # from the previous iteration of the filter (for $t > 0$).
-        forecast[:, t] = (
-            np.dot(model.design[:, :, design_t], predicted_state[:, t]) +
-            model.obs_intercept[:, obs_intercept_t]
-        )
+        if nmissing[t] == 1:
 
-        # *Intermediate calculation* (used just below and then once more)
-        # `tmp1` array used here, dimension $(m \times p)$
-        # $\\#_1 = P_t Z_t'$
-        # $(m \times p) = (m \times m) (p \times m)'$
-        tmp1 = np.dot(predicted_state_cov[:, :, t],
-                      model.design[:, :, design_t].T)
-
-        # #### Forecast error for time t
-        # `forecast_error` $\equiv v_t = y_t -$ `forecast`
-        forecast_error[:, t] = model.obs[:, t] - forecast[:, t]
-
-        # #### Forecast error covariance matrix for time t
-        # $F_t \equiv Z_t P_t Z_t' + H_t$
-        forecast_error_cov[:, :, t] = (
-            np.dot(model.design[:, :, design_t], tmp1) +
-            model.obs_cov[:, :, obs_cov_t]
-        )
-        # Store the inverse
-        # import pdb; pdb.set_trace()
-        forecast_error_cov_inv = 1.0 / forecast_error_cov[0, 0, t]
-        determinant = forecast_error_cov[0, 0, t]
-        tmp2 = forecast_error_cov_inv * forecast_error[:, t]
-        tmp3 = forecast_error_cov_inv * model.design[:, :, design_t]
-
-        # U, info = lapack.dpotrf(forecast_error_cov[:, :, t])
-        # determinant = np.product(U.diagonal())**2
-        # tmp2, info = lapack.dpotrs(U, forecast_error[:, t])
-        # tmp3, info = lapack.dpotrs(U, model.design[:, :, design_t])
-        # if k_endog == 1 and inversion_method & INVERT_UNIVARIATE:
-        #     forecast_error_cov_inv = 1.0 / forecast_error_cov[0, 0, t]
-        #     determinant = forecast_error_cov[0, 0, t]
-        #     tmp2 = forecast_error_cov_inv * forecast_error[:, t]
-        #     tmp3 = forecast_error_cov_inv * model.design[:, :, design_t]
-        # elif inversion_method & SOLVE_CHOLESKY:
-        #     U, info = lapack.dpotrf(forecast_error_cov[:, :, t])
-        #     determinant = np.product(U.diagonal())**2
-        #     tmp2, info = lapack.dpotrs(U, forecast_error[:, t])
-        #     tmp3, info = lapack.dpotrs(U, model.design[:, :, design_t])
-        # else:
-        #     forecast_error_cov_inv = np.linalg.inv(forecast_error_cov[:, :, t])
-        #     determinant = np.linalg.det(forecast_error_cov[:, :, t])
-        #     tmp2 = np.dot(forecast_error_cov_inv, forecast_error[:, t])
-        #     tmp3 = np.dot(forecast_error_cov_inv, model.design[:, :, design_t])
-
-        # #### Filtered state for time t
-        # $a_{t|t} = a_t + P_t Z_t' F_t^{-1} v_t$
-        # $a_{t|t} = 1.0 * \\#_1 \\#_2 + 1.0 a_t$
-        filtered_state[:, t] = (
-            predicted_state[:, t] + np.dot(tmp1, tmp2)
-        )
-
-        # #### Filtered state covariance for time t
-        # $P_{t|t} = P_t - P_t Z_t' F_t^{-1} Z_t P_t$
-        # $P_{t|t} = P_t - \\#_1 \\#_3 P_t$
-        filtered_state_cov[:, :, t] = (
-            predicted_state_cov[:, :, t] -
-            np.dot(
-                np.dot(tmp1, tmp3),
-                predicted_state_cov[:, :, t]
+            # forecast[:, t] = 0
+            forecast[:, t] = (
+                np.dot(model.design[:, :, design_t], predicted_state[:, t]) +
+                model.obs_intercept[:, obs_intercept_t]
             )
-        )
+            forecast_error[:, t] = np.nan
+            # import pdb; pdb.set_trace()
 
-        # #### Loglikelihood
-        loglikelihood[t] = -0.5 * (
-            np.log((2*np.pi)**k_endog * determinant) +
-            np.dot(forecast_error[:, t], tmp2)
-        )
+
+            tmp1 = np.dot(predicted_state_cov[:, :, t],
+                          model.design[:, :, design_t].T)
+            forecast_error_cov[:, :, t] = (
+                np.dot(model.design[:, :, design_t], tmp1) +
+                model.obs_cov[:, :, obs_cov_t]
+            )
+
+            filtered_state[:, t] = predicted_state[:, t]
+            filtered_state_cov[:, :, t] = predicted_state_cov[:, :, t]
+
+            loglikelihood[t] = 0
+
+        else:
+            #     forecast_error_cov[:, :, t] = np.nan
+            #     loglikelihood[t] = np.nan
+            #     predicted_state[:, t+1] = np.nan
+            #     predicted_state_cov[:, :, t+1] = np.nan
+
+            # #### Forecast for time t
+            # `forecast` $= Z_t a_t + d_t$
+            #
+            # *Note*: $a_t$ is given from the initialization (for $t = 0$) or
+            # from the previous iteration of the filter (for $t > 0$).
+            forecast[:, t] = (
+                np.dot(model.design[:, :, design_t], predicted_state[:, t]) +
+                model.obs_intercept[:, obs_intercept_t]
+            )
+
+            # *Intermediate calculation* (used just below and then once more)
+            # `tmp1` array used here, dimension $(m \times p)$
+            # $\\#_1 = P_t Z_t'$
+            # $(m \times p) = (m \times m) (p \times m)'$
+            tmp1 = np.dot(predicted_state_cov[:, :, t],
+                          model.design[:, :, design_t].T)
+
+            # #### Forecast error for time t
+            # `forecast_error` $\equiv v_t = y_t -$ `forecast`
+            forecast_error[:, t] = model.obs[:, t] - forecast[:, t]
+
+            # #### Forecast error covariance matrix for time t
+            # $F_t \equiv Z_t P_t Z_t' + H_t$
+            forecast_error_cov[:, :, t] = (
+                np.dot(model.design[:, :, design_t], tmp1) +
+                model.obs_cov[:, :, obs_cov_t]
+            )
+            # Store the inverse
+            forecast_error_cov_inv = 1.0 / forecast_error_cov[0, 0, t]
+            determinant = forecast_error_cov[0, 0, t]
+            tmp2 = forecast_error_cov_inv * forecast_error[:, t]
+            tmp3 = forecast_error_cov_inv * model.design[:, :, design_t]
+
+            # U, info = lapack.dpotrf(forecast_error_cov[:, :, t])
+            # determinant = np.product(U.diagonal())**2
+            # tmp2, info = lapack.dpotrs(U, forecast_error[:, t])
+            # tmp3, info = lapack.dpotrs(U, model.design[:, :, design_t])
+            # if k_endog == 1 and inversion_method & INVERT_UNIVARIATE:
+            #     forecast_error_cov_inv = 1.0 / forecast_error_cov[0, 0, t]
+            #     determinant = forecast_error_cov[0, 0, t]
+            #     tmp2 = forecast_error_cov_inv * forecast_error[:, t]
+            #     tmp3 = forecast_error_cov_inv * model.design[:, :, design_t]
+            # elif inversion_method & SOLVE_CHOLESKY:
+            #     U, info = lapack.dpotrf(forecast_error_cov[:, :, t])
+            #     determinant = np.product(U.diagonal())**2
+            #     tmp2, info = lapack.dpotrs(U, forecast_error[:, t])
+            #     tmp3, info = lapack.dpotrs(U, model.design[:, :, design_t])
+            # else:
+            #     forecast_error_cov_inv = np.linalg.inv(forecast_error_cov[:, :, t])
+            #     determinant = np.linalg.det(forecast_error_cov[:, :, t])
+            #     tmp2 = np.dot(forecast_error_cov_inv, forecast_error[:, t])
+            #     tmp3 = np.dot(forecast_error_cov_inv, model.design[:, :, design_t])
+
+            # #### Filtered state for time t
+            # $a_{t|t} = a_t + P_t Z_t' F_t^{-1} v_t$
+            # $a_{t|t} = 1.0 * \\#_1 \\#_2 + 1.0 a_t$
+            filtered_state[:, t] = (
+                predicted_state[:, t] + np.dot(tmp1, tmp2)
+            )
+
+            # #### Filtered state covariance for time t
+            # $P_{t|t} = P_t - P_t Z_t' F_t^{-1} Z_t P_t$
+            # $P_{t|t} = P_t - \\#_1 \\#_3 P_t$
+            filtered_state_cov[:, :, t] = (
+                predicted_state_cov[:, :, t] -
+                np.dot(
+                    np.dot(tmp1, tmp3),
+                    predicted_state_cov[:, :, t]
+                )
+            )
+
+            # #### Loglikelihood
+            loglikelihood[t] = -0.5 * (
+                np.log((2*np.pi)**k_endog * determinant) +
+                np.dot(forecast_error[:, t], tmp2)
+            )
 
         # #### Predicted state for time t+1
         # $a_{t+1} = T_t a_{t|t} + c_t$
