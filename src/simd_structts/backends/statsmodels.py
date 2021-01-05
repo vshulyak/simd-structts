@@ -20,10 +20,6 @@ class SMResults:
         self.res = res
 
     def get_forecast(self, horizon, exog=None):
-        """
-        TODO: check if params match to sm
-        TODO: check uncertainty
-        """
         return SMPredictionResults(
             [r.get_forecast(horizon, exog=exog) for r in self.res]
         )

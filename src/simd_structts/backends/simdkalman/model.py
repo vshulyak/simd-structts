@@ -69,10 +69,6 @@ class SIMDKalmanFilterResults:
         )
 
     def get_forecast(self, horizon, exog=None):
-        """
-        TODO: check if params match to sm
-        TODO: check uncertainty
-        """
         return SIMDKalmanPredictionResults(
             self._compute(horizon=horizon, exog=exog).predicted
         )

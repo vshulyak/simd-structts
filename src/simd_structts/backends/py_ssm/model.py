@@ -201,20 +201,28 @@ class PySSMStructTS(BaseModel):
                 time_invariant=self.time_invariant,
             )
 
-            self.kfilters += [kalman_filter(
-                mdef,
-                initial_state=self.initial_value,
-                initial_state_cov=self.initial_covariance,
-            )]
+            self.kfilters += [
+                kalman_filter(
+                    mdef,
+                    initial_state=self.initial_value,
+                    initial_state_cov=self.initial_covariance,
+                )
+            ]
 
         self.filter_result = FilterResult(
             filtered_state=np.stack([k.filtered_state.T for k in self.kfilters]),
-            filtered_state_cov=np.stack([k.filtered_state_cov.T for k in self.kfilters]),
+            filtered_state_cov=np.stack(
+                [k.filtered_state_cov.T for k in self.kfilters]
+            ),
             predicted_state=np.stack([k.predicted_state.T for k in self.kfilters]),
-            predicted_state_cov=np.stack([k.predicted_state_cov.T for k in self.kfilters]),
+            predicted_state_cov=np.stack(
+                [k.predicted_state_cov.T for k in self.kfilters]
+            ),
             forecast=np.stack([k.forecast.T for k in self.kfilters]),
             forecast_error=np.stack([k.forecast_error.T for k in self.kfilters]),
-            forecast_error_cov=np.stack([k.forecast_error_cov.T for k in self.kfilters]),
+            forecast_error_cov=np.stack(
+                [k.forecast_error_cov.T for k in self.kfilters]
+            ),
             llf_obs=np.stack([k.loglikelihood.T for k in self.kfilters]),
         )
         return self.filter_result
@@ -249,9 +257,7 @@ class PySSMStructTS(BaseModel):
                 k_endog=self.k_endog,
                 k_states=self.k_states,
                 selection=np.eye(self.k_states)[:, :, np.newaxis],
-                state_cov=self.state_cov[
-                    series_idx:series_idx+1, :, :
-                ].T,
+                state_cov=self.state_cov[series_idx : series_idx + 1, :, :].T,
                 design=design,
                 obs_intercept=self.obs_intercept,
                 obs_cov=self.obs_cov[:, :, np.newaxis],
@@ -259,11 +265,13 @@ class PySSMStructTS(BaseModel):
                 state_intercept=self.state_intercept,
                 time_invariant=self.time_invariant,
             )
-            res += [kalman_filter(
-                mdef,
-                initial_state=kfilter.predicted_state[..., -1],
-                initial_state_cov=kfilter.predicted_state_cov[..., -1],
-            )]
+            res += [
+                kalman_filter(
+                    mdef,
+                    initial_state=kfilter.predicted_state[..., -1],
+                    initial_state_cov=kfilter.predicted_state_cov[..., -1],
+                )
+            ]
 
         return ForecastResult(
             predicted_mean=np.stack([k.forecast[0] for k in res]),
@@ -350,7 +358,6 @@ class PySSMStructTS(BaseModel):
             smoothed_forecasts_error_res += [smoothed_forecasts_error]
             smoothed_forecasts_error_cov_res += [smoothed_forecasts_error_cov]
 
-
         return SmoothResult(
             filtered_state=self.filter_result.filtered_state,
             filtered_state_cov=self.filter_result.filtered_state_cov,
@@ -360,9 +367,19 @@ class PySSMStructTS(BaseModel):
             forecast_error=self.filter_result.forecast_error,
             forecast_error_cov=self.filter_result.forecast_error_cov,
             llf_obs=self.filter_result.llf_obs,
-            smoothed_state=np.stack([k.smoothed_state.T for k in ks_r_res]), # ks_r.smoothed_state,
-            smoothed_state_cov=np.stack([k.smoothed_state_cov.T for k in ks_r_res]), #ks_r.smoothed_state_cov,
-            smoothed_forecasts=np.stack([sf.squeeze() for sf in smoothed_forecasts_res]), #smoothed_forecasts,
-            smoothed_forecasts_error=np.stack([sf.T for sf in smoothed_forecasts_error_res]), #smoothed_forecasts_error,
-            smoothed_forecasts_error_cov=np.stack([sf.T for sf in smoothed_forecasts_error_cov_res]), #smoothed_forecasts_error_cov,
+            smoothed_state=np.stack(
+                [k.smoothed_state.T for k in ks_r_res]
+            ),  # ks_r.smoothed_state,
+            smoothed_state_cov=np.stack(
+                [k.smoothed_state_cov.T for k in ks_r_res]
+            ),  # ks_r.smoothed_state_cov,
+            smoothed_forecasts=np.stack(
+                [sf.squeeze() for sf in smoothed_forecasts_res]
+            ),  # smoothed_forecasts,
+            smoothed_forecasts_error=np.stack(
+                [sf.T for sf in smoothed_forecasts_error_res]
+            ),  # smoothed_forecasts_error,
+            smoothed_forecasts_error_cov=np.stack(
+                [sf.T for sf in smoothed_forecasts_error_cov_res]
+            ),  # smoothed_forecasts_error_cov,
         )
