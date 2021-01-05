@@ -1,10 +1,6 @@
 import numpy as np
 import pytest
 
-from simd_structts.backends.simdkalman.model import SIMDStructTS
-from simd_structts.backends.statsmodels import MultiUnobservedComponents
-
-from .utils import assert_models_equal
 
 N = 366
 H = 30
@@ -72,10 +68,11 @@ def test_permute_params(
     # simd_m.initialize_approx_diffuse()
     # simd_r = simd_m.smooth()
 
-    from statsmodels.tsa.statespace.kalman_filter import FILTER_UNIVARIATE, FILTER_CONVENTIONAL, INVERT_UNIVARIATE, SOLVE_CHOLESKY
-    from statsmodels.tsa.statespace.kalman_smoother import SMOOTH_CONVENTIONAL, SMOOTH_CLASSICAL, SMOOTH_ALTERNATIVE, SMOOTH_UNIVARIATE
+    from statsmodels.tsa.statespace.kalman_filter import (
+        FILTER_CONVENTIONAL,
+        INVERT_UNIVARIATE,
+    )
     from statsmodels.tsa.statespace.structural import UnobservedComponents
-
 
     # sm_m = MultiUnobservedComponents(ts1ts2, **{**kwargs, **dict(filter_method=FILTER_CONVENTIONAL, #FILTER_UNIVARIATE,
     #                     inversion_method=INVERT_UNIVARIATE)})
@@ -89,24 +86,36 @@ def test_permute_params(
 
     # m1 = simd_r
     # m2 = sm_r
-    freq_seasonal_periods = [d['period'] for d in freq_seasonal] if freq_seasonal else None
+    freq_seasonal_periods = (
+        [d["period"] for d in freq_seasonal] if freq_seasonal else None
+    )
 
-    m = UnobservedComponents(ts1ts2[0,:,0], **{**kwargs, **dict(filter_method=FILTER_CONVENTIONAL, #FILTER_UNIVARIATE,
-                        # stability_method=None,
-                        stochastic_freq_seasonal=[False] * len(freq_seasonal_periods) if freq_seasonal else None,
-                        inversion_method=INVERT_UNIVARIATE)})
+    m = UnobservedComponents(
+        ts1ts2[0, :, 0],
+        **{
+            **kwargs,
+            **dict(
+                filter_method=FILTER_CONVENTIONAL,  # FILTER_UNIVARIATE,
+                # stability_method=None,
+                stochastic_freq_seasonal=[False] * len(freq_seasonal_periods)
+                if freq_seasonal
+                else None,
+                inversion_method=INVERT_UNIVARIATE,
+            ),
+        },
+    )
     # m.ssm.transition = np.around(m.ssm.transition, 2)
 
     # m.ssm.initial_variance = 0
     # m.ssm.stability_force_symmetry = False
-    #m.ssm.stability_force_symmetry
-    #m.ssm.stability_method
+    # m.ssm.stability_force_symmetry
+    # m.ssm.stability_method
 
     m.ssm.initialization.set(
         index=None,
         initialization_type="known",
         constant=np.zeros(m.ssm.k_states),
-        stationary_cov=np.eye(m.ssm.k_states) * 1e4 #* 1e6,
+        stationary_cov=np.eye(m.ssm.k_states) * 1e4,  # * 1e6,
     )
 
     # stability?
@@ -120,7 +129,6 @@ def test_permute_params(
 
     _, pyssm_r = kalman_filter(m.ssm)
 
-
     def assert_models_equal(m1, m2):
         assert np.allclose(m1.filtered_state, m2.filtered_state)
         assert np.allclose(m1.filtered_state_cov, m2.filtered_state_cov)
@@ -128,7 +136,6 @@ def test_permute_params(
         assert np.allclose(m1.predicted_state_cov, m2.predicted_state_cov)
 
     assert_models_equal(pyssm_r, res)
-
 
     # assert True is False
     # assert_models_equal(simd_r, sm_r, h=H, exog_predict=exog_predict)

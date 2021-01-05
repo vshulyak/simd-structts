@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-
 from simd_structts.backends.simdkalman.model import SIMDStructTS
 from simd_structts.backends.statsmodels import MultiUnobservedComponents
 

@@ -1,13 +1,10 @@
 import numpy as np
-
 import simdkalman
 from simdkalman.kalmanfilter import Gaussian
-from simdkalman.primitives import (
-    ddot_t_right,
-    ensure_matrix,
-    predict_observation,
-    priv_update_with_nan_check,
-)
+from simdkalman.primitives import ddot_t_right
+from simdkalman.primitives import ensure_matrix
+from simdkalman.primitives import predict_observation
+from simdkalman.primitives import priv_update_with_nan_check
 
 
 class EKalmanFilter(simdkalman.KalmanFilter):
@@ -23,7 +20,7 @@ class EKalmanFilter(simdkalman.KalmanFilter):
         covariances=True,
         observations=True,
         likelihoods=False,
-        gains=True, # False,
+        gains=True,  # False,
         log_likelihood=False,
         verbose=False,
     ):
@@ -102,7 +99,6 @@ class EKalmanFilter(simdkalman.KalmanFilter):
         if gains:
             result.filtered.gains = np.empty((n_vars, n_measurements, n_states, n_obs))
 
-
         # TODO: fixme / save to result
         self.ms = [m]
         self.Ps = [P]
@@ -141,11 +137,11 @@ class EKalmanFilter(simdkalman.KalmanFilter):
             self.Ps += [P]
 
         # TODO: fixme / save to result
-        self.ms = np.swapaxes(np.stack(self.ms), 0, 1)[:,:,:,0]
+        self.ms = np.swapaxes(np.stack(self.ms), 0, 1)[:, :, :, 0]
         self.Ps = np.swapaxes(np.stack(self.Ps), 0, 1)
 
-        self.filtered_observations_mean = 1*filtered_observations.mean
-        self.filtered_observations_cov = 1*filtered_observations.cov
+        self.filtered_observations_mean = 1 * filtered_observations.mean
+        self.filtered_observations_cov = 1 * filtered_observations.cov
 
         if smoothed:
             result.smoothed = EKalmanFilter.Result()
@@ -253,9 +249,7 @@ class EKalmanFilter(simdkalman.KalmanFilter):
         return result
 
     def update(self, m, P, y, j, log_likelihood=False):
-        """
-        Update KF – with design matrix exog handling for every step
-        """
+        """Update KF – with design matrix exog handling for every step."""
         assert j is not None, "step has to be provided"
 
         # modify design matrix in case we're dealing with exog variables
@@ -276,9 +270,7 @@ class EKalmanFilter(simdkalman.KalmanFilter):
         )
 
     def predict_observation(self, m, P, j):
-        """
-        Predict KF – with design matrix exog handling for every step
-        """
+        """Predict KF – with design matrix exog handling for every step."""
         assert j is not None, "step has to be provided"
 
         # modify design matrix in case we're dealing with exog variables

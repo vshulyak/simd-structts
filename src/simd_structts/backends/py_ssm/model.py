@@ -1,10 +1,17 @@
-import numpy as np
-
 from dataclasses import dataclass
 
+import numpy as np
+
 from ..base import BaseModel
+from .filter import FILTER_CONVENTIONAL
+from .filter import INVERT_UNIVARIATE
 from .filter import kalman_filter
-from .smoother import get_kalman_gain, ksmooth_rep, get_smoothed_forecasts
+from .filter import MEMORY_STORE_ALL
+from .filter import SOLVE_CHOLESKY
+from .filter import STABILITY_FORCE_SYMMETRY
+from .smoother import get_kalman_gain
+from .smoother import get_smoothed_forecasts
+from .smoother import ksmooth_rep
 
 
 class PySSMPredictionResults:
@@ -109,8 +116,6 @@ class PySSMFilterResults:
         return self.kf.Ps
 
 
-from .filter import FILTER_CONVENTIONAL, INVERT_UNIVARIATE, SOLVE_CHOLESKY, STABILITY_FORCE_SYMMETRY, MEMORY_STORE_ALL
-
 @dataclass
 class ModelDefinition:
 
@@ -125,11 +130,11 @@ class ModelDefinition:
     transition: np.ndarray
     state_intercept: np.ndarray
     time_invariant: bool
+    k_endog: int
 
     # dynamic
     nobs: int
     k_states: int
-    k_endog: int = 1
 
     dtype = np.float64
 
@@ -141,13 +146,13 @@ class ModelDefinition:
     tolerance = 0
 
 
-
 @dataclass
-class FilterResult():
+class FilterResult:
     filtered_state: np.ndarray
     filtered_state_cov: np.ndarray
     predicted_state: np.ndarray
     predicted_state_cov: np.ndarray
+    forecast: np.ndarray
     forecast_error: np.ndarray
     forecast_error_cov: np.ndarray
     loglikelihood: np.ndarray
@@ -169,48 +174,46 @@ class ForecastResult:
 
 
 class PySSMStructTS(BaseModel):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.kfilter = None
 
-    def filter(self, ssm):
-        mdef = ModelDefinition(
-            obs=self.endog[0,...].T,  # TODO use only the first serie for debugging
-            nobs=self.nobs,
-            # k_endog=self.k_endog,
-            k_states=self.k_states,
-            selection=np.eye(self.k_states)[:,:,np.newaxis],
-            state_cov=self.state_cov[0:1,:,:].T,  # TODO: selecting only for the first model
-            design=self.design[:,:,np.newaxis] if self.design.ndim < 3 else np.swapaxes(self.design.T, 0, 1),
-            obs_intercept=np.array([[0.]]),
-            obs_cov=self.obs_cov[:,:,np.newaxis],
-            transition=self.transition[:,:,np.newaxis],
-            state_intercept=np.array([[0.]]*self.k_states),
-            time_invariant=self.design.ndim < 3  # TODO
-        )
-        """
-        time_invariant = (
-            self.model.design.shape[2] == 1           and
-            self.model.obs_cov.shape[2] == 1          and
-            self.model.transition.shape[2] == 1       and
-            self.model.selection.shape[2] == 1        and
-            self.model.state_cov.shape[2] == 1)
-        """
+    def filter(self, models):
+        i = 0
 
-        # assert np.allclose(mdef.obs, ssm.obs)
-        # assert np.allclose(mdef.nobs, ssm.nobs)
-        # assert np.allclose(mdef.k_states, ssm.k_states)
-        # # assert np.allclose(mdef.selection, ssm.selection)
-        # # assert np.allclose(mdef.state_cov, ssm.state_cov)
-        # assert np.allclose(mdef.design, ssm.design)
-        # assert np.allclose(mdef.obs_intercept, ssm.obs_intercept)
-        # assert np.allclose(mdef.obs_cov, ssm.obs_cov)
-        # assert np.allclose(mdef.transition, ssm.transition)
-        # assert np.allclose(mdef.state_intercept, ssm.state_intercept)
-        # assert np.allclose(mdef.time_invariant, ssm.time_invariant)
-        _, self.kfilter = kalman_filter(mdef, initial_value=self.initial_value, initial_covariance=self.initial_covariance)
-        return self.kfilter
+        mdef = ModelDefinition(
+            obs=self.endog[i, ...].T,
+            nobs=self.nobs,
+            k_endog=self.k_endog,
+            k_states=self.k_states,
+            selection=self.selection,
+            state_cov=self.state_cov[i : i + 1, :, :].T,
+            design=self.design[:, :, np.newaxis]
+            if self.design.ndim < 3
+            else np.swapaxes(self.design.T, 0, 1),
+            obs_intercept=self.obs_intercept,
+            obs_cov=self.obs_cov[:, :, np.newaxis],
+            transition=self.transition[:, :, np.newaxis],
+            state_intercept=self.state_intercept,
+            time_invariant=self.time_invariant,
+        )
+
+        self.kfilter = kalman_filter(
+            mdef,
+            initial_state=self.initial_value,
+            initial_state_cov=self.initial_covariance,
+        )
+
+        return FilterResult(
+            filtered_state=self.kfilter.filtered_state,
+            filtered_state_cov=self.kfilter.filtered_state_cov,
+            predicted_state=self.kfilter.predicted_state,
+            predicted_state_cov=self.kfilter.predicted_state_cov,
+            forecast=self.kfilter.forecast,
+            forecast_error=self.kfilter.forecast_error,
+            forecast_error_cov=self.kfilter.forecast_error_cov,
+            loglikelihood=self.kfilter.loglikelihood,
+        )
 
     def forecast(self, h, exog=None):
         if not self.kfilter:
@@ -218,51 +221,69 @@ class PySSMStructTS(BaseModel):
 
         if exog is not None:
             assert exog.shape == (h, self.k_exog)
-            rr = self.design[0,0,:-self.k_exog]
-            rr2 = np.repeat(rr[:,np.newaxis], h, axis=1)
-            design = np.vstack([rr2, exog.T])[np.newaxis,:,:]
+            static_non_exog = self.design[0, 0, : -self.k_exog]
+            static_non_exog_repeated = np.repeat(
+                static_non_exog[:, np.newaxis], h, axis=1
+            )
+            design = np.vstack([static_non_exog_repeated, exog.T])[np.newaxis, :, :]
         else:
-            design = self.design[:,:,np.newaxis] if self.design.ndim < 3 else np.swapaxes(self.design.T, 0, 1)
+            design = (
+                self.design[:, :, np.newaxis]
+                if self.design.ndim < 3
+                else np.swapaxes(self.design.T, 0, 1)
+            )
 
         mdef = ModelDefinition(
-            obs=np.array([np.nan] * h)[np.newaxis,:],
+            obs=np.array([np.nan] * h)[np.newaxis, :],
             nobs=h,
+            k_endog=self.k_endog,
             k_states=self.k_states,
-            selection=np.eye(self.k_states)[:,:,np.newaxis],
-            state_cov=self.state_cov[0:1,:,:].T,  # TODO: selecting only for the first model
-            design=design,  # TODO
-            obs_intercept=np.array([[0.]]),
-            obs_cov=self.obs_cov[:,:,np.newaxis],
-            transition=self.transition[:,:,np.newaxis],
-            state_intercept=np.array([[0.]]*self.k_states),
-            time_invariant=design.ndim < 3  # TODO
+            selection=np.eye(self.k_states)[:, :, np.newaxis],
+            state_cov=self.state_cov[
+                0:1, :, :
+            ].T,  # TODO: selecting only for the first model
+            design=design,
+            obs_intercept=self.obs_intercept,
+            obs_cov=self.obs_cov[:, :, np.newaxis],
+            transition=self.transition[:, :, np.newaxis],
+            state_intercept=self.state_intercept,
+            time_invariant=self.time_invariant,
         )
-        _, kfilter = kalman_filter(mdef, initial_value=self.kfilter.predicted_state[...,-1],
-                                   initial_covariance=self.kfilter.predicted_state_cov[...,-1])
+        kfilter = kalman_filter(
+            mdef,
+            initial_state=self.kfilter.predicted_state[..., -1],
+            initial_state_cov=self.kfilter.predicted_state_cov[..., -1],
+        )
 
         return ForecastResult(
             predicted_mean=kfilter.forecast[0],
-            se_mean=np.sqrt(kfilter.forecast_error_cov[0, 0, :])
+            se_mean=np.sqrt(kfilter.forecast_error_cov[0, 0, :]),
         )
 
     def smooth(self, ssm, res):
         if not self.kfilter:
             self.kfilter = self.filter(ssm)
 
-        endog = self.endog[0,...].T
+        design = (
+            self.design[:, :, np.newaxis]
+            if self.design.ndim < 3
+            else np.swapaxes(self.design.T, 0, 1)
+        )
+        transition = self.transition[:, :, np.newaxis]
+        obs_cov = self.obs_cov[:, :, np.newaxis]
+
+        i = 0
+
+        endog = self.endog[i, ...].T
 
         missing = np.isnan(endog).astype(np.int32)  # same dim as endog
-        nmissing = missing.sum(axis=0)  # (nobs) shape, sum of all missing accross missing axis
-
-        # TODO: move & test these (can stack single call for starters)
-        k_endog = 1
-        design = self.design[:,:,np.newaxis] if self.design.ndim < 3 else np.swapaxes(self.design.T, 0, 1)
-        transition = self.transition[:,:,np.newaxis]
-        obs_cov = self.obs_cov[:,:,np.newaxis]
+        nmissing = missing.sum(
+            axis=0
+        )  # (nobs) shape, sum of all missing accross missing axis
 
         kg = get_kalman_gain(
             k_states=self.k_states,
-            k_endog=k_endog,
+            k_endog=self.k_endog,
             nobs=self.nobs,
             dtype=np.float64,
             nmissing=nmissing,
@@ -270,57 +291,51 @@ class PySSMStructTS(BaseModel):
             transition=transition,
             predicted_state_cov=self.kfilter.predicted_state_cov,
             missing=missing,
-            forecasts_error_cov=self.kfilter.forecast_error_cov
+            forecasts_error_cov=self.kfilter.forecast_error_cov,
         )
 
-        assert np.allclose(self.k_states, ssm.k_states)
-        assert np.allclose(k_endog, ssm.k_endog)
-        assert np.allclose(self.nobs, ssm.nobs)
-        assert np.allclose(design, ssm.design)
-        assert np.allclose(transition, ssm.transition)
-        assert np.allclose(obs_cov, ssm.obs_cov)
-        assert np.allclose(self.kfilter.predicted_state, res.filter_results.predicted_state)
-        assert np.allclose(self.kfilter.predicted_state_cov, res.filter_results.predicted_state_cov)
-        assert np.allclose(self.kfilter.forecast_error, res.filter_results.forecasts_error, equal_nan=True)
-        assert np.allclose(self.kfilter.forecast_error_cov, res.filter_results.forecasts_error_cov)
-        assert np.allclose(kg, res.filter_results._kalman_gain)
+        ks_r = ksmooth_rep(
+            k_states=self.k_states,
+            k_endog=self.k_endog,
+            nobs=self.nobs,
+            design_inp=design,
+            transition_inp=transition,
+            obs_cov_inp=obs_cov,
+            kalman_gain_inp=kg,
+            predicted_state_inp=self.kfilter.predicted_state,
+            predicted_state_cov_inp=self.kfilter.predicted_state_cov,
+            forecasts_error_inp=self.kfilter.forecast_error,
+            forecasts_error_cov_inp=self.kfilter.forecast_error_cov,
+            nmissing=nmissing,
+            missing=missing,
+        )
 
-        # # TODO: stack this for every endog
-        ks_r = ksmooth_rep(k_states=self.k_states, #
-                        k_endog=k_endog, #
-                        nobs=self.nobs, #
-                        design_inp=design, #
-                        transition_inp=transition, #
-                        obs_cov_inp=obs_cov, #np.zeros((1,1,1)), # res_smooth.filter_results.obs_cov,
-                        kalman_gain_inp=kg,
-                        predicted_state_inp=self.kfilter.predicted_state,
-                        predicted_state_cov_inp=self.kfilter.predicted_state_cov,
-                        forecasts_error_inp=self.kfilter.forecast_error, #
-                        forecasts_error_cov_inp=self.kfilter.forecast_error_cov, #
-                        nmissing=nmissing,
-                        missing=missing,
-                        )
-
-        smoothed_forecasts, smoothed_forecasts_error, smoothed_forecasts_error_cov = get_smoothed_forecasts(
+        (
+            smoothed_forecasts,
+            smoothed_forecasts_error,
+            smoothed_forecasts_error_cov,
+        ) = get_smoothed_forecasts(
             endog=endog,
             smoothed_state=ks_r.smoothed_state,
             smoothed_state_cov=ks_r.smoothed_state_cov,
             nobs=self.nobs,
             design=design,
             obs_cov=obs_cov,
-            obs_intercept=np.array([[0.]]),
+            obs_intercept=self.obs_intercept,
             missing=missing,
             nmissing=nmissing,
             forecasts=self.kfilter.forecast,
             forecasts_error=self.kfilter.forecast_error,
             forecasts_error_cov=self.kfilter.forecast_error_cov,
-            dtype=np.float64)
+            dtype=np.float64,
+        )
 
         return SmoothResult(
             filtered_state=self.kfilter.filtered_state,
             filtered_state_cov=self.kfilter.filtered_state_cov,
             predicted_state=self.kfilter.predicted_state,
             predicted_state_cov=self.kfilter.predicted_state_cov,
+            forecast=self.kfilter.forecast,
             forecast_error=self.kfilter.forecast_error,
             forecast_error_cov=self.kfilter.forecast_error_cov,
             loglikelihood=self.kfilter.loglikelihood,
@@ -328,5 +343,5 @@ class PySSMStructTS(BaseModel):
             smoothed_state_cov=ks_r.smoothed_state_cov,
             smoothed_forecasts=smoothed_forecasts,
             smoothed_forecasts_error=smoothed_forecasts_error,
-            smoothed_forecasts_error_cov=smoothed_forecasts_error_cov
+            smoothed_forecasts_error_cov=smoothed_forecasts_error_cov,
         )

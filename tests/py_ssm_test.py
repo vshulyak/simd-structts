@@ -1,10 +1,7 @@
 import numpy as np
 import pytest
-
-from simd_structts.backends.simdkalman.model import SIMDStructTS
 from simd_structts.backends.statsmodels import MultiUnobservedComponents
 
-from .utils import assert_models_equal
 
 N = 366
 H = 30
@@ -23,9 +20,7 @@ EXOG_DOUBLE_TUPLE = (np.random.random((N, 2)), np.random.random((H, 2)))
         [{"period": 365.25 / 2, "harmonics": 2}, {"period": 365.25, "harmonics": 1}],
     ],
 )
-@pytest.mark.parametrize(
-    "exog_train,exog_predict", [(None, None)]  #
-)
+@pytest.mark.parametrize("exog_train,exog_predict", [(None, None)])  #
 # @pytest.mark.parametrize("trend", [False]) # True,
 # @pytest.mark.parametrize("seasonal", [None]) # , 2, 7
 # @pytest.mark.parametrize(
@@ -72,12 +67,21 @@ def test_permute_params(
     # simd_m.initialize_approx_diffuse()
     # simd_r = simd_m.smooth()
 
-    from statsmodels.tsa.statespace.kalman_filter import FILTER_UNIVARIATE, FILTER_CONVENTIONAL, INVERT_UNIVARIATE, SOLVE_CHOLESKY
-    from statsmodels.tsa.statespace.kalman_smoother import SMOOTH_CONVENTIONAL, SMOOTH_CLASSICAL, SMOOTH_ALTERNATIVE, SMOOTH_UNIVARIATE
+    from statsmodels.tsa.statespace.kalman_filter import (
+        FILTER_CONVENTIONAL,
+        INVERT_UNIVARIATE,
+    )
 
-
-    sm_m = MultiUnobservedComponents(ts1ts2, **{**kwargs, **dict(filter_method=FILTER_CONVENTIONAL, #FILTER_UNIVARIATE,
-                        inversion_method=INVERT_UNIVARIATE)})
+    sm_m = MultiUnobservedComponents(
+        ts1ts2,
+        **{
+            **kwargs,
+            **dict(
+                filter_method=FILTER_CONVENTIONAL,  # FILTER_UNIVARIATE,
+                inversion_method=INVERT_UNIVARIATE,
+            ),
+        },
+    )
 
     # sm_m = MultiUnobservedComponents(ts1ts2, **{**kwargs, **dict(filter_method=FILTER_CONVENTIONAL)})
     # sm_m = MultiUnobservedComponents(ts1ts2, **{**kwargs, **dict(filter_method=FILTER_UNIVARIATE, smooth_method=SMOOTH_UNIVARIATE)})
@@ -105,7 +109,6 @@ def test_permute_params(
         assert np.allclose(m1.predicted_state_cov, m2.predicted_state_cov)
 
     assert_models_equal(pyssm_r, m2.res[0])
-
 
     # assert True is False
     # assert_models_equal(simd_r, sm_r, h=H, exog_predict=exog_predict)

@@ -105,7 +105,7 @@ class MultiUnobservedComponents:
                 index=None,
                 initialization_type="known",
                 constant=np.zeros(dims),
-                stationary_cov=np.eye(dims) * initial_state_cov
+                stationary_cov=np.eye(dims) * initial_state_cov,
             )
 
             self.start_params += [m.start_params]

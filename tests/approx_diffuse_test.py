@@ -1,17 +1,11 @@
 import numpy as np
 import pytest
-
-from hypothesis import given
-from hypothesis import strategies as st
-# from hypothesis.strategies import floats
-from hypothesis.extra.numpy import arrays
-
 from simd_structts.backends.simdkalman.model import SIMDStructTS
 from simd_structts.backends.statsmodels import MultiUnobservedComponents
 
-
-
 from .utils import assert_models_equal
+
+# from hypothesis.strategies import floats
 
 N = 366
 H = 30
@@ -45,7 +39,7 @@ def test_permute_params(
 ):
 
     # NANs
-    ts1ts2[:,10:20] = np.nan
+    ts1ts2[:, 10:20] = np.nan
 
     kwargs = dict(
         level=True,
@@ -61,10 +55,6 @@ def test_permute_params(
     simd_m = SIMDStructTS(ts1ts2, **kwargs)
     simd_m.initialize_approx_diffuse(obs_cov=1e-1, initial_state_cov=1e3)
     simd_r = simd_m.smooth()
-
-    from statsmodels.tsa.statespace.kalman_filter import FILTER_UNIVARIATE, FILTER_CONVENTIONAL
-    from statsmodels.tsa.statespace.kalman_smoother import SMOOTH_CONVENTIONAL, SMOOTH_CLASSICAL, SMOOTH_ALTERNATIVE, SMOOTH_UNIVARIATE
-
 
     # sm_m = MultiUnobservedComponents(ts1ts2, **{**kwargs, **dict(filter_method=FILTER_CONVENTIONAL)})
     # sm_m = MultiUnobservedComponents(ts1ts2, **{**kwargs, **dict(filter_method=FILTER_UNIVARIATE, smooth_method=SMOOTH_UNIVARIATE)})

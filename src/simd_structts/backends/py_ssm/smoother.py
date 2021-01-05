@@ -1,10 +1,10 @@
-import numpy as np
-
 from dataclasses import dataclass
+
+import numpy as np
 
 
 @dataclass
-class KSResult():
+class KSResult:
     smoothing_error: np.ndarray
     scaled_smoothed_estimator: np.ndarray
     scaled_smoothed_estimator_cov: np.ndarray
@@ -12,14 +12,21 @@ class KSResult():
     smoothed_state_cov: np.ndarray
 
 
-def get_kalman_gain(k_states, k_endog, nobs, dtype, nmissing, design, transition,
-                    predicted_state_cov, missing, forecasts_error_cov):
-    """
-    Kalman gain matrices
-    """
+def get_kalman_gain(
+    k_states,
+    k_endog,
+    nobs,
+    dtype,
+    nmissing,
+    design,
+    transition,
+    predicted_state_cov,
+    missing,
+    forecasts_error_cov,
+):
+    """Kalman gain matrices."""
     # k x n
-    _kalman_gain = np.zeros(
-        (k_states, k_endog, nobs), dtype=dtype)
+    _kalman_gain = np.zeros((k_states, k_endog, nobs), dtype=dtype)
 
     for t in range(nobs):
         # In the case of entirely missing observations, let the Kalman
@@ -32,43 +39,45 @@ def get_kalman_gain(k_states, k_endog, nobs, dtype, nmissing, design, transition
         if nmissing[t] == 0:
             # non-missing
             _kalman_gain[:, :, t] = np.dot(
-                np.dot(
-                    transition[:, :, transition_t],
-                    predicted_state_cov[:, :, t]
-                ),
+                np.dot(transition[:, :, transition_t], predicted_state_cov[:, :, t]),
                 np.dot(
                     np.transpose(design[:, :, design_t]),
-                    np.linalg.inv(forecasts_error_cov[:, :, t])
-                )
+                    np.linalg.inv(forecasts_error_cov[:, :, t]),
+                ),
             )
         else:
             # missing
             mask = ~missing[:, t].astype(bool)
             F = forecasts_error_cov[np.ix_(mask, mask, [t])]
             _kalman_gain[:, mask, t] = np.dot(
+                np.dot(transition[:, :, transition_t], predicted_state_cov[:, :, t]),
                 np.dot(
-                    transition[:, :, transition_t],
-                    predicted_state_cov[:, :, t]
+                    np.transpose(design[mask, :, design_t]), np.linalg.inv(F[:, :, 0])
                 ),
-                np.dot(
-                    np.transpose(design[mask, :, design_t]),
-                    np.linalg.inv(F[:, :, 0])
-                )
             )
 
     return _kalman_gain
 
 
-def get_smoothed_forecasts(endog, smoothed_state, smoothed_state_cov, nobs, design, obs_cov,
-    obs_intercept, missing, nmissing, forecasts, forecasts_error, forecasts_error_cov, dtype):
+def get_smoothed_forecasts(
+    endog,
+    smoothed_state,
+    smoothed_state_cov,
+    nobs,
+    design,
+    obs_cov,
+    obs_intercept,
+    missing,
+    nmissing,
+    forecasts,
+    forecasts_error,
+    forecasts_error_cov,
+    dtype,
+):
     # Initialize empty arrays
     smoothed_forecasts = np.zeros(forecasts.shape, dtype)
-    smoothed_forecasts_error = (
-        np.zeros(forecasts_error.shape, dtype=dtype)
-    )
-    smoothed_forecasts_error_cov = (
-        np.zeros(forecasts_error_cov.shape, dtype=dtype)
-    )
+    smoothed_forecasts_error = np.zeros(forecasts_error.shape, dtype=dtype)
+    smoothed_forecasts_error_cov = np.zeros(forecasts_error_cov.shape, dtype=dtype)
 
     for t in range(nobs):
         design_t = 0 if design.shape[2] == 1 else t
@@ -77,43 +86,50 @@ def get_smoothed_forecasts(endog, smoothed_state, smoothed_state_cov, nobs, desi
 
         mask = ~missing[:, t].astype(bool)
         # We can recover forecasts
-        smoothed_forecasts[:, t] = np.dot(
-            design[:, :, design_t], smoothed_state[:, t]
-        ) + obs_intercept[:, obs_intercept_t]
+        smoothed_forecasts[:, t] = (
+            np.dot(design[:, :, design_t], smoothed_state[:, t])
+            + obs_intercept[:, obs_intercept_t]
+        )
         if nmissing[t] > 0:
             smoothed_forecasts_error[:, t] = np.nan
-        smoothed_forecasts_error[mask, t] = (
-            endog[mask, t] - smoothed_forecasts[mask, t]
+        smoothed_forecasts_error[mask, t] = endog[mask, t] - smoothed_forecasts[mask, t]
+        smoothed_forecasts_error_cov[:, :, t] = (
+            np.dot(
+                np.dot(design[:, :, design_t], smoothed_state_cov[:, :, t]),
+                design[:, :, design_t].T,
+            )
+            + obs_cov[:, :, obs_cov_t]
         )
-        smoothed_forecasts_error_cov[:, :, t] = np.dot(
-            np.dot(design[:, :, design_t],
-                   smoothed_state_cov[:, :, t]),
-            design[:, :, design_t].T
-        ) + obs_cov[:, :, obs_cov_t]
 
-    return (
-        smoothed_forecasts,
-        smoothed_forecasts_error,
-        smoothed_forecasts_error_cov
-    )
+    return (smoothed_forecasts, smoothed_forecasts_error, smoothed_forecasts_error_cov)
 
 
-def ksmooth_rep(k_states, k_endog, nobs,
-            design_inp, transition_inp,
-            obs_cov_inp,
-            kalman_gain_inp, predicted_state_inp, predicted_state_cov_inp,
-            forecasts_error_inp, forecasts_error_cov_inp, nmissing, missing):
+def ksmooth_rep(
+    k_states,
+    k_endog,
+    nobs,
+    design_inp,
+    transition_inp,
+    obs_cov_inp,
+    kalman_gain_inp,
+    predicted_state_inp,
+    predicted_state_cov_inp,
+    forecasts_error_inp,
+    forecasts_error_cov_inp,
+    nmissing,
+    missing,
+):
 
-    scaled_smoothed_estimator = (
-        np.zeros((k_states, nobs+1))) #   # model.  # , dtype=kfilter.dtype)
-    smoothing_error = (
-        np.zeros((k_endog, nobs)))  # model.  3 , dtype=kfilter.dtype)
-    scaled_smoothed_estimator_cov = (
-        np.zeros((k_states, k_states, nobs+1))) # + 1 # model. dtype=kfilter.dtype
+    scaled_smoothed_estimator = np.zeros(
+        (k_states, nobs + 1)
+    )  #   # model.  # , dtype=kfilter.dtype)
+    smoothing_error = np.zeros((k_endog, nobs))  # model.  3 , dtype=kfilter.dtype)
+    scaled_smoothed_estimator_cov = np.zeros(
+        (k_states, k_states, nobs + 1)
+    )  # + 1 # model. dtype=kfilter.dtype
 
     smoothed_state = np.zeros((k_states, nobs))
-    smoothed_state_cov = (
-        np.zeros((k_states, k_states, nobs)))
+    smoothed_state_cov = np.zeros((k_states, k_states, nobs))
 
     # obs_cov_t = 0
     # design_t = 0
@@ -122,7 +138,7 @@ def ksmooth_rep(k_states, k_endog, nobs,
     # missing = np.isnan(model.obs).astype(np.int32)  # same dim as endog
     # nmissing = missing.sum(axis=0)  # (nobs) shape, sum of all missing accross missing axis
 
-    for t in range(nobs-1, -1, -1):
+    for t in range(nobs - 1, -1, -1):
 
         # Get the appropriate (possibly time-varying) indices
         design_t = 0 if design_inp.shape[2] == 1 else t
@@ -131,13 +147,11 @@ def ksmooth_rep(k_states, k_endog, nobs,
         # selection_t = 0 if selection_inp.shape[2] == 1 else t
         # state_cov_t = 0 if kfilter.state_cov.shape[2] == 1 else t
 
-        predicted_state = predicted_state_inp[:, t] # kfilter.
-        predicted_state_cov = predicted_state_cov_inp[:, :, t] # kfilter.
+        predicted_state = predicted_state_inp[:, t]  # kfilter.
+        predicted_state_cov = predicted_state_cov_inp[:, :, t]  # kfilter.
 
-        missing_entire_obs = (
-            nmissing[t] == k_endog)
-        missing_partial_obs = (
-            not missing_entire_obs and nmissing[t] > 0)
+        missing_entire_obs = nmissing[t] == k_endog
+        missing_partial_obs = not missing_entire_obs and nmissing[t] > 0
 
         mask = ~missing[:, t].astype(bool)
         if missing_partial_obs:
@@ -170,55 +184,45 @@ def ksmooth_rep(k_states, k_endog, nobs,
         transition = transition_inp[:, :, transition_t]
         L = transition - kalman_gain.dot(design)
 
-
         if missing_entire_obs:
             # smoothing_error is undefined here, keep it as zeros
-            scaled_smoothed_estimator[:, t - 1] = (
-                transition.transpose().dot(scaled_smoothed_estimator[:, t])
+            scaled_smoothed_estimator[:, t - 1] = transition.transpose().dot(
+                scaled_smoothed_estimator[:, t]
             )
         else:
-            smoothing_error[:k_endog, t] = (
-                F_inv.dot(forecasts_error) -
-                kalman_gain.transpose().dot(
-                    scaled_smoothed_estimator[:, t])
-            )
+            smoothing_error[:k_endog, t] = F_inv.dot(
+                forecasts_error
+            ) - kalman_gain.transpose().dot(scaled_smoothed_estimator[:, t])
 
-            scaled_smoothed_estimator[:, t - 1] = (
-                design.transpose().dot(smoothing_error[:k_endog, t]) +
-                transition.transpose().dot(scaled_smoothed_estimator[:, t])
-            )
+            scaled_smoothed_estimator[:, t - 1] = design.transpose().dot(
+                smoothing_error[:k_endog, t]
+            ) + transition.transpose().dot(scaled_smoothed_estimator[:, t])
 
         if missing_entire_obs:
             scaled_smoothed_estimator_cov[:, :, t - 1] = (
-                L.transpose().dot(
-                    scaled_smoothed_estimator_cov[:, :, t]
-                ).dot(L)
+                L.transpose().dot(scaled_smoothed_estimator_cov[:, :, t]).dot(L)
             )
         else:
-            scaled_smoothed_estimator_cov[:, :, t - 1] = (
-                design.transpose().dot(F_inv).dot(design) +
-                L.transpose().dot(
-                    scaled_smoothed_estimator_cov[:, :, t]
-                ).dot(L)
+            scaled_smoothed_estimator_cov[:, :, t - 1] = design.transpose().dot(
+                F_inv
+            ).dot(design) + L.transpose().dot(
+                scaled_smoothed_estimator_cov[:, :, t]
+            ).dot(
+                L
             )
 
-        smoothed_state[:, t] = (
-            predicted_state +
-            predicted_state_cov.dot(scaled_smoothed_estimator[:, t - 1])
+        smoothed_state[:, t] = predicted_state + predicted_state_cov.dot(
+            scaled_smoothed_estimator[:, t - 1]
         )
 
-        smoothed_state_cov[:, :, t] = (
-            predicted_state_cov -
-            predicted_state_cov.dot(
-                scaled_smoothed_estimator_cov[:, :, t - 1]
-            ).dot(predicted_state_cov)
-        )
-
+        smoothed_state_cov[:, :, t] = predicted_state_cov - predicted_state_cov.dot(
+            scaled_smoothed_estimator_cov[:, :, t - 1]
+        ).dot(predicted_state_cov)
 
     return KSResult(
         smoothing_error=smoothing_error,
-        scaled_smoothed_estimator=scaled_smoothed_estimator[:,:-1],
-        scaled_smoothed_estimator_cov=scaled_smoothed_estimator_cov[:,:,:-1],
+        scaled_smoothed_estimator=scaled_smoothed_estimator[:, :-1],
+        scaled_smoothed_estimator_cov=scaled_smoothed_estimator_cov[:, :, :-1],
         smoothed_state=smoothed_state,
-        smoothed_state_cov=smoothed_state_cov
+        smoothed_state_cov=smoothed_state_cov,
     )

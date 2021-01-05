@@ -3,9 +3,9 @@ from statsmodels.tsa.statespace.tools import companion_matrix
 
 
 class BaseModel:
-    """
-    A base for all models which takes care of all initialization procedures
-    """
+    """A base for all models which takes care of all initialization
+    procedures."""
+
     def __init__(
         self,
         endog,
@@ -113,14 +113,30 @@ class BaseModel:
         self.design = np.zeros((1, k_states))
         self.state_cov = np.zeros((self.k_series, k_states, k_states))
 
-        # TODO: fixme duplicate
+        # Initialized later
         self.obs_cov = np.array([[0.0]])
 
-        # TODO: fixme duplicate
-        self.initial_value = np.ones(k_states)
-        self.initial_covariance = np.eye(4)
+        # Initialized later
+        self.initial_value = None
+        self.initial_covariance = None
 
         self.setup()
+
+        self.k_endog = 1
+        self.selection = np.eye(self.k_states)[:, :, np.newaxis]
+        self.obs_intercept = np.array([[0.0]])
+        self.state_intercept = np.array([[0.0]] * self.k_states)
+        self.time_invariant = self.design.ndim < 3
+
+        """
+        A better definition if all matrices are time varying
+        self.time_invariant = (
+            self.design.shape[2] == 1           and
+            self.obs_cov.shape[2] == 1          and
+            self.transition.shape[2] == 1       and
+            self.selection.shape[2] == 1        and
+            self.state_cov.shape[2] == 1)
+        """
 
     def initialize_fixed(self, obs_cov=0, initial_state_cov=1e6):
 
@@ -237,7 +253,6 @@ class BaseModel:
         # self.obs_cov = [self.obs_cov, self.obs_cov]
 
     def __str__(self):
-        print(self.transition.shape)
         return (
             "Transition:\n"
             + str(self.transition)
@@ -250,9 +265,7 @@ class BaseModel:
         )
 
     def setup(self):
-        """
-        Setup the structural time series representation
-        """
+        """Setup the structural time series representation."""
         # Initialize the ordered sets of parameters
         #         self.parameters = {}
         #         self.parameters_obs_intercept = {}

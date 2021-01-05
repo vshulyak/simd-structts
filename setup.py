@@ -12,12 +12,9 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/vshulyak/simd-structts",
-    packages=setuptools.find_packages(where='src'),
-    package_dir={'': 'src'},
-    install_requires=[
-        'statsmodels>=0.11.1',
-        'simdkalman>=1.0.1'
-    ],
+    packages=setuptools.find_packages(where="src"),
+    package_dir={"": "src"},
+    install_requires=["statsmodels>=0.11.1", "simdkalman>=1.0.1"],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

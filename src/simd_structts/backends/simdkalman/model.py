@@ -109,8 +109,6 @@ class SIMDKalmanFilterResults:
 
 
 class SIMDStructTS(BaseModel):
-
-
     def smooth(self):
         kf = EKalmanFilter(
             state_transition=self.transition,
