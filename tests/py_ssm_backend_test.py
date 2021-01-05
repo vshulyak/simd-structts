@@ -73,26 +73,26 @@ def test_permute_params(
 
     pyssm_m = PySSMStructTS(ts1ts2, **kwargs)
     pyssm_m.initialize_approx_diffuse(obs_cov=1e-1, initial_state_cov=1e3)
-    pyssm_smoother = pyssm_m.smooth(sm_m.models[0].ssm, sm_r.res[0])
+    pyssm_smoother = pyssm_m.smooth()
 
     pyssm_preds = pyssm_m.forecast(H, exog=exog_predict)
-    sm_preds = sm_r.res[0].get_forecast(H, exog=exog_predict)
+    sm_preds = sm_r.get_forecast(H, exog=exog_predict)
 
     def assert_filters_equal(m1, m2):
         assert np.allclose(m1.filtered_state, m2.filtered_state)
         assert np.allclose(m1.filtered_state_cov, m2.filtered_state_cov)
         assert np.allclose(m1.predicted_state, m2.predicted_state)
         assert np.allclose(m1.predicted_state_cov, m2.predicted_state_cov)
-        assert np.allclose(m1.forecast_error, m2.forecasts_error, equal_nan=True)
-        assert np.allclose(m1.forecast_error_cov, m2.forecasts_error_cov)
-        assert np.allclose(m1.loglikelihood, m2.llf_obs)
+        assert np.allclose(m1.forecast_error, m2.forecast_error, equal_nan=True)
+        assert np.allclose(m1.forecast_error_cov, m2.forecast_error_cov)
+        assert np.allclose(m1.llf_obs, m2.llf_obs)
         # TODO: llf
 
     def assert_smoothers_equal(m1, m2):
         assert np.allclose(m1.smoothed_state, m2.smoothed_state)
         assert np.allclose(m1.smoothed_state_cov, m2.smoothed_state_cov)
         assert np.allclose(
-            m1.smoothed_forecasts, m2.smoother_results.smoothed_forecasts
+            m1.smoothed_forecasts, m2.smoothed_forecasts
         )
         # assert np.allclose(m1.smoothed_forecasts_error, m2.smoother_results.smoothed_forecasts_error)
         # assert np.allclose(m1.smoothed_forecasts_error_cov, m2.smoother_results.smoothed_forecasts_error_cov)
@@ -101,6 +101,6 @@ def test_permute_params(
         assert np.allclose(m1.predicted_mean, m2.predicted_mean)
         assert np.allclose(m1.se_mean, m2.se_mean)
 
-    assert_filters_equal(pyssm_smoother, sm_r.res[0])
-    assert_smoothers_equal(pyssm_smoother, sm_r.res[0])
+    assert_filters_equal(pyssm_smoother, sm_r)
+    assert_smoothers_equal(pyssm_smoother, sm_r)
     assert_forecasts_equal(pyssm_preds, sm_preds, h=H, exog_predict=exog_predict)

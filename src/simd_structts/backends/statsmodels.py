@@ -58,6 +58,18 @@ class SMResults:
     def predicted_state_cov(self):
         return np.stack([r.predicted_state_cov.T for r in self.res])
 
+    @property
+    def forecast_error(self):
+        return np.stack([r.forecasts_error.T for r in self.res])
+
+    @property
+    def forecast_error_cov(self):
+        return np.stack([r.forecasts_error_cov.T for r in self.res])
+
+    @property
+    def llf_obs(self):
+        return np.stack([r.llf_obs for r in self.res])
+
 
 class MultiUnobservedComponents:
     def __init__(self, endog, **kwargs):
