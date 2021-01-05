@@ -219,6 +219,8 @@ class PySSMStructTS(BaseModel):
         if not self.kfilter:
             self.kfilter = self.filter(ssm)
 
+        i = 0
+
         if exog is not None:
             assert exog.shape == (h, self.k_exog)
             static_non_exog = self.design[0, 0, : -self.k_exog]
@@ -240,8 +242,8 @@ class PySSMStructTS(BaseModel):
             k_states=self.k_states,
             selection=np.eye(self.k_states)[:, :, np.newaxis],
             state_cov=self.state_cov[
-                0:1, :, :
-            ].T,  # TODO: selecting only for the first model
+                i:i+1, :, :
+            ].T,
             design=design,
             obs_intercept=self.obs_intercept,
             obs_cov=self.obs_cov[:, :, np.newaxis],
