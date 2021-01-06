@@ -190,7 +190,7 @@ class PySSMStructTS(BaseModel):
                 k_endog=self.k_endog,
                 k_states=self.k_states,
                 selection=self.selection,
-                state_cov=self.state_cov[series_idx : series_idx + 1, :, :].T,
+                state_cov=self.state_cov[series_idx, :, :][:, :, np.newaxis],
                 design=self.design[:, :, np.newaxis]
                 if self.design.ndim < 3
                 else np.swapaxes(self.design.T, 0, 1),
@@ -257,7 +257,7 @@ class PySSMStructTS(BaseModel):
                 k_endog=self.k_endog,
                 k_states=self.k_states,
                 selection=np.eye(self.k_states)[:, :, np.newaxis],
-                state_cov=self.state_cov[series_idx : series_idx + 1, :, :].T,
+                state_cov=self.state_cov[series_idx, :, :][:, :, np.newaxis],
                 design=design,
                 obs_intercept=self.obs_intercept,
                 obs_cov=self.obs_cov[:, :, np.newaxis],

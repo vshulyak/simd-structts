@@ -55,6 +55,10 @@ class SMResults:
         return np.stack([r.predicted_state_cov.T for r in self.res])
 
     @property
+    def forecast(self):
+        return np.stack([r.forecasts.T for r in self.res])
+
+    @property
     def forecast_error(self):
         return np.stack([r.forecasts_error.T for r in self.res])
 
