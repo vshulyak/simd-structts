@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 from simd_structts.backends.simd.model import RawStructTS
-from simd_structts.backends.simdkalman.model import SIMDStructTS
 from simd_structts.backends.statsmodels import MultiUnobservedComponents
 from statsmodels.tsa.statespace.kalman_filter import FILTER_CONVENTIONAL
 from statsmodels.tsa.statespace.kalman_smoother import SMOOTH_CONVENTIONAL
@@ -9,12 +8,18 @@ from statsmodels.tsa.statespace.kalman_smoother import SMOOTH_CONVENTIONAL
 
 N = 366
 H = 30
+N_SERIES = 2
+
 EXOG_SINGLE_TUPLE = (np.random.random((N, 1)), np.random.random((H, 1)))
 EXOG_DOUBLE_TUPLE = (np.random.random((N, 2)), np.random.random((H, 2)))
+EXOG_INDIVIDUAL_TRIPLE_TUPLE = (
+    np.random.random((N_SERIES, N, 3)),
+    np.random.random((N_SERIES, H, 3)),
+)
 
 OBS_COV = 1e-1
 INITIAL_STATE_COV = 1e3
-
+#
 # @pytest.mark.parametrize("trend", [True, ]) # False
 # @pytest.mark.parametrize("seasonal", [None])  # , 2, 7
 # @pytest.mark.parametrize(
@@ -27,7 +32,7 @@ INITIAL_STATE_COV = 1e3
 #     ],
 # )
 # @pytest.mark.parametrize(
-#     "exog_train,exog_predict", [EXOG_DOUBLE_TUPLE]  #(None, None),  EXOG_SINGLE_TUPLE ,EXOG_DOUBLE_TUPLE
+#     "exog_train,exog_predict", [EXOG_INDIVIDUAL_TRIPLE_TUPLE]  #(None, None),  EXOG_SINGLE_TUPLE ,EXOG_DOUBLE_TUPLE, EXOG_INDIVIDUAL_TRIPLE_TUPLE
 # )
 @pytest.mark.parametrize("trend", [True, False])  #
 @pytest.mark.parametrize("seasonal", [None, 2, 7])  #
@@ -41,7 +46,13 @@ INITIAL_STATE_COV = 1e3
     ],
 )
 @pytest.mark.parametrize(
-    "exog_train,exog_predict", [(None, None), EXOG_SINGLE_TUPLE, EXOG_DOUBLE_TUPLE]  #
+    "exog_train,exog_predict",
+    [
+        (None, None),
+        EXOG_SINGLE_TUPLE,
+        EXOG_DOUBLE_TUPLE,
+        EXOG_INDIVIDUAL_TRIPLE_TUPLE,
+    ],  #
 )
 def test_permute_params(
     ts1ts2, trend, seasonal, freq_seasonal, exog_train, exog_predict
@@ -73,11 +84,11 @@ def test_permute_params(
     sm_r = sm_m.smooth()
     sm_preds = sm_r.get_forecast(H, exog=exog_predict)
 
-    simd_m = SIMDStructTS(ts1ts2, **kwargs)
-    simd_m.initialize_approx_diffuse(
-        obs_cov=OBS_COV, initial_state_cov=INITIAL_STATE_COV
-    )
-    simd_r = simd_m.smooth()
+    # simd_m = SIMDStructTS(ts1ts2, **kwargs)
+    # simd_m.initialize_approx_diffuse(
+    #     obs_cov=OBS_COV, initial_state_cov=INITIAL_STATE_COV
+    # )
+    # simd_r = simd_m.smooth()
     # simd_preds = simd_r.get_forecast(H, exog=exog_predict)
 
     raw_m = RawStructTS(ts1ts2, **kwargs)

@@ -39,7 +39,7 @@ class BaseModel:
         # irregular NA
         assert irregular is False
 
-        assert exog is None or exog.ndim == 2
+        assert exog is None or exog.ndim in (2, 3)
         assert (
             mle_regression is False
         ), "MLE is not supported for estimating params currently"
@@ -86,7 +86,14 @@ class BaseModel:
         self.nobs = endog.shape[1]
 
         # Exogenous component
-        self.k_exog = exog.shape[1] if exog is not None else 0
+        if exog is None:
+            self.k_exog = 0
+        elif exog.ndim == 2:
+            self.k_exog = exog.shape[1]
+        elif exog.ndim == 3:
+            self.k_exog = exog.shape[2]
+        else:
+            raise
         self.exog = exog
 
         self.regression = self.k_exog > 0
@@ -184,7 +191,11 @@ class BaseModel:
 
             # Eliminate missing data to estimate starting parameters
             endog = self.endog[series_idx, :]
-            exog = self.exog
+            exog = (
+                self.exog[series_idx, ...]
+                if self.exog is not None and self.exog.ndim == 3
+                else self.exog
+            )
             if np.any(np.isnan(endog)):
                 mask = ~np.isnan(endog).squeeze()
                 endog = endog[mask]
@@ -341,8 +352,21 @@ class BaseModel:
         if self.regression:
 
             # add exog to the design matrix (3d matrices are a special case in our KF)
-            self.design = np.repeat(self.design[np.newaxis, :, :], self.nobs, axis=0)
-            self.design[:, 0, i : i + self.k_exog] = self.exog
+            if self.exog.ndim == 2:
+                self.design = np.repeat(
+                    self.design[np.newaxis, :, :], self.nobs, axis=0
+                )
+                self.design[:, 0, i : i + self.k_exog] = self.exog
+            elif self.exog.ndim == 3:
+                self.design = np.repeat(
+                    self.design[np.newaxis, :, :], self.nobs, axis=0
+                )
+                self.design = np.repeat(
+                    self.design[np.newaxis, :, :], self.k_series, axis=0
+                )
+                self.design[:, :, 0, i : i + self.k_exog] = self.exog
+            else:
+                raise
 
             self.transition[i : i + self.k_exog, i : i + self.k_exog] = np.eye(
                 self.k_exog

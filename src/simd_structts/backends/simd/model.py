@@ -31,13 +31,26 @@ class FilterResult:
         n_measurements = self.model.endog.shape[1]
         n_states = self.model.transition.shape[0]
 
-        if exog is not None:
+        if exog is not None and exog.ndim == 2:
             assert exog.shape == (h, self.model.k_exog)
             static_non_exog = self.model.design[0, 0, : -self.model.k_exog]
             static_non_exog_repeated = np.repeat(
                 static_non_exog[np.newaxis, :], h, axis=0
             )
             design = np.hstack([static_non_exog_repeated, exog])[:, np.newaxis, :]
+        elif exog is not None and exog.ndim == 3:
+            assert exog.shape == (self.model.k_series, h, self.model.k_exog)
+            static_non_exog = self.model.design[0, 0, 0, : -self.model.k_exog]
+            static_non_exog_repeated = np.repeat(
+                static_non_exog[np.newaxis, :], h, axis=0
+            )
+            static_non_exog_repeated = np.repeat(
+                static_non_exog_repeated[np.newaxis, :], self.model.k_series, axis=0
+            )
+            # design = np.hstack([static_non_exog_repeated, exog])[:, np.newaxis, :]
+            design = np.concatenate([static_non_exog_repeated, exog], axis=2)[
+                :, :, np.newaxis, :
+            ]
         else:
             design = self.model.design
 
@@ -51,11 +64,18 @@ class FilterResult:
 
         for i in range(h):
 
+            H = design
+
             # handle time-varying matrices (H for now only)
-            if design.ndim == 3:
-                H_t = design[i]
-            elif design.ndim == 2:
-                H_t = design
+            # separate exog for each series
+            if H.ndim == 4:
+                H_t = H[:, i, ...]
+            # common exog for all series
+            elif H.ndim == 3:
+                H_t = H[i][np.newaxis, ...]
+            # no exog
+            elif H.ndim == 2:
+                H_t = H[np.newaxis, ...]
             else:
                 raise
 
@@ -140,14 +160,71 @@ class RawStructTS(BaseModel):
 
         for i in range(self.nobs):
             # handle time-varying matrices (H for now only)
-            if H.ndim == 3:
-                H_t = H[i]
+            # separate exog for each series
+            if H.ndim == 4:
+                H_t = H[:, i, ...]
+            # common exog for all series
+            elif H.ndim == 3:
+                H_t = H[i][np.newaxis, ...]
+            # no exog
             elif H.ndim == 2:
-                H_t = H
+                H_t = H[np.newaxis, ...]
             else:
                 raise
 
             y = data[:, i, ...].reshape((n_vars, n_obs, 1))
+            #
+            #
+            # from simdkalman.primitives import ddot, ddot_t_right, dinv, autoshape
+            #
+            # # @autoshape
+            # def _update(prior_mean, prior_covariance, observation_model, observation_noise, measurement, log_likelihood=False):
+            #
+            #     n = prior_mean.shape[1]
+            #     m = observation_model.shape[1]
+            #
+            #     assert(measurement.shape[-2:] == (m,1))
+            #     assert(prior_covariance.shape[-2:] == (n,n))
+            #     assert(observation_model.shape[-2:] == (m,n))
+            #     assert(observation_noise.shape[-2:] == (m,m))
+            #
+            #     # y - H * mp
+            #     v = measurement - ddot(observation_model, prior_mean)
+            #     # (2, 1, 1) - (1, 1, 4) @ (2, 4, 1)
+            #
+            #
+            #     # H * Pp * H.t + R
+            #     S = ddot(observation_model, ddot_t_right(prior_covariance, observation_model)) + observation_noise
+            #     invS = dinv(S)
+            #
+            #     # Kalman gain: Pp * H.t * invS
+            #     K = ddot(ddot_t_right(prior_covariance, observation_model), invS)
+            #
+            #     # K * v + mp
+            #     posterior_mean = ddot(K, v) + prior_mean
+            #
+            #     # Pp - K * H * Pp
+            #     posterior_covariance = prior_covariance - ddot(K, ddot(observation_model, prior_covariance))
+            #
+            #     # inv-chi2 test var
+            #     # outlier_test = np.sum(v * ddot(invS, v), axis=0)
+            #     if log_likelihood:
+            #         l = np.ravel(ddot(v.transpose((0,2,1)), ddot(invS, v)))
+            #         l += np.log(np.linalg.det(S))
+            #         l *= -0.5
+            #         return posterior_mean, posterior_covariance, K, l
+            #     else:
+            #         return posterior_mean, posterior_covariance, K
+            #
+            #     return posterior_mean, posterior_covariance
+            #
+            # mo, Po, Ko = simdkalman.primitives.priv_update_with_nan_check(m, P, H_t, R, y)
+            # # m, P, K = _update(m, P, H_t, R, y)
+            # m, P, K = _update(m, P, H_t[np.newaxis,...], R[np.newaxis,...], y)
+
+            # assert np.allclose(mo, m)
+
+            # import pdb; pdb.set_trace()
 
             # forecast of the endog var
             obs_mean, obs_cov = simdkalman.primitives.predict_observation(m, P, H_t, R)

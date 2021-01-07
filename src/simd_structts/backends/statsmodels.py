@@ -21,7 +21,15 @@ class SMResults:
 
     def get_forecast(self, horizon, exog=None):
         return SMPredictionResults(
-            [r.get_forecast(horizon, exog=exog) for r in self.res]
+            [
+                r.get_forecast(
+                    horizon,
+                    exog=exog[series_idx, ...]
+                    if exog is not None and exog.ndim == 3
+                    else exog,
+                )
+                for series_idx, r in enumerate(self.res)
+            ]
         )
 
     @property
@@ -76,13 +84,18 @@ class MultiUnobservedComponents:
         self.exog = exog = kwargs.pop("exog", None)
         self.kwargs = kwargs
         assert endog.ndim == 3
-        assert exog is None or exog.ndim == 2
+        assert exog is None or exog.ndim in (2, 3)
 
         self.n_models = endog.shape[0]
         self.models = []
 
-        for i in range(self.n_models):
-            m = UnobservedComponents(endog[i, ...], exog=exog, **kwargs)
+        for series_idx in range(self.n_models):
+            exog = (
+                self.exog[series_idx, ...]
+                if self.exog is not None and self.exog.ndim == 3
+                else self.exog
+            )
+            m = UnobservedComponents(endog[series_idx, ...], exog=exog, **kwargs)
             self.models += [m]
 
     def initialize_fixed(self, obs_cov=0, initial_state_cov=1e6):
