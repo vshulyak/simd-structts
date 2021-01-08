@@ -95,7 +95,8 @@ def test_permute_params(
     raw_m.initialize_approx_diffuse(
         obs_cov=OBS_COV, initial_state_cov=INITIAL_STATE_COV
     )
-    raw_smoother = raw_m.filter()
+    # raw_smoother = raw_m.filter()
+    raw_smoother = raw_m.smooth()
     raw_preds = raw_smoother.get_forecast(H, exog=exog_predict)
 
     def assert_filters_equal(m1, m2):
@@ -115,6 +116,16 @@ def test_permute_params(
         assert np.allclose(m1.predicted_mean, m2.predicted_mean)
         assert np.allclose(m1.se_mean, m2.se_mean)
 
-    # assert_filters_equal(raw_smoother, sm_r)
-    # assert_smoothers_equal(pyssm_smoother, sm_r)
     assert_forecasts_equal(raw_preds, sm_preds)
+
+    def assert_smoothers_equal(m1, m2):
+        # import pdb; pdb.set_trace()
+        assert np.allclose(m1.smoothed_state, m2.smoothed_state)
+        assert np.allclose(m1.smoothed_state_cov, m2.smoothed_state_cov)
+        assert np.allclose(m1.smoothed_forecasts, m2.smoothed_forecasts)
+        # assert np.allclose(m1.smoothed_forecasts_error, m2.smoother_results.smoothed_forecasts_error)
+        # assert np.allclose(m1.smoothed_forecasts_error_cov, m2.smoother_results.smoothed_forecasts_error_cov)
+
+    # assert_filters_equal(raw_smoother, sm_r)
+    assert_smoothers_equal(raw_smoother, sm_r)
+    # assert_forecasts_equal(raw_preds, sm_preds)

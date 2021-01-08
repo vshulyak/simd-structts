@@ -19,6 +19,7 @@ class FilterResult:
     predicted_state: np.ndarray
     predicted_state_cov: np.ndarray
     forecast: np.ndarray
+    forecast_cov: np.ndarray
     forecast_error: np.ndarray
     forecast_error_cov: np.ndarray
     llf: np.float64
@@ -96,6 +97,76 @@ class FilterResult:
         )
 
 
+@dataclass
+class SmootherResult(FilterResult):
+    smoothed_state: np.ndarray
+    smoothed_state_cov: np.ndarray
+    smoothed_forecasts: np.ndarray
+    smoothed_forecasts_cov: np.ndarray
+
+
+from simdkalman.primitives import ddot, ddot_t_right, dinv
+
+
+def update_with_nan_check(
+    prior_mean,
+    prior_covariance,
+    observation_model,
+    observation_noise,
+    measurement,
+    univariate=True,
+):
+
+    n = prior_mean.shape[1]
+    m = observation_model.shape[1]
+
+    assert measurement.shape[-2:] == (m, 1)
+    assert prior_covariance.shape[-2:] == (n, n)
+    assert observation_model.shape[-2:] == (m, n)
+    assert observation_noise.shape[-2:] == (m, m)
+
+    # y - H * mp
+    v = measurement - ddot(observation_model, prior_mean)
+    # (2, 1, 1) - (1, 1, 4) @ (2, 4, 1)
+
+    # H * Pp * H.t + R
+    S = (
+        ddot(observation_model, ddot_t_right(prior_covariance, observation_model))
+        + observation_noise
+    )
+    if univariate:
+        invS = 1.0 / S
+    else:
+        invS = dinv(S)
+
+    # Kalman gain: Pp * H.t * invS
+    K = ddot(ddot_t_right(prior_covariance, observation_model), invS)
+
+    # K * v + mp
+    posterior_mean = ddot(K, v) + prior_mean
+
+    # Pp - K * H * Pp
+    posterior_covariance = prior_covariance - ddot(
+        K, ddot(observation_model, prior_covariance)
+    )
+
+    # inv-chi2 test var
+    # outlier_test = np.sum(v * ddot(invS, v), axis=0)
+    l = np.ravel(ddot(v.transpose((0, 2, 1)), ddot(invS, v)))
+    l += np.log(np.linalg.det(S))
+    l *= -0.5
+
+    # nan checks
+    is_nan = np.ravel(np.any(np.isnan(posterior_mean), axis=1))
+
+    posterior_mean[is_nan, ...] = prior_mean[is_nan, ...]
+    posterior_covariance[is_nan, ...] = prior_covariance[is_nan, ...]
+    K[is_nan, ...] = 0
+    l[is_nan] = 0
+
+    return posterior_mean, posterior_covariance, K, l
+
+
 class RawStructTS(BaseModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -116,7 +187,7 @@ class RawStructTS(BaseModel):
         A = self.transition  # state_transition
         Q = self.state_cov  # process_noise
 
-        # ---- Measurement model: different noise level for each sample
+        # ---- Measurement model
         H = self.design  # observation_model
         R = self.obs_cov  # observation_noise
 
@@ -173,67 +244,15 @@ class RawStructTS(BaseModel):
                 raise
 
             y = data[:, i, ...].reshape((n_vars, n_obs, 1))
-            #
-            #
-            # from simdkalman.primitives import ddot, ddot_t_right, dinv, autoshape
-            #
-            # # @autoshape
-            # def _update(prior_mean, prior_covariance, observation_model, observation_noise, measurement, log_likelihood=False):
-            #
-            #     n = prior_mean.shape[1]
-            #     m = observation_model.shape[1]
-            #
-            #     assert(measurement.shape[-2:] == (m,1))
-            #     assert(prior_covariance.shape[-2:] == (n,n))
-            #     assert(observation_model.shape[-2:] == (m,n))
-            #     assert(observation_noise.shape[-2:] == (m,m))
-            #
-            #     # y - H * mp
-            #     v = measurement - ddot(observation_model, prior_mean)
-            #     # (2, 1, 1) - (1, 1, 4) @ (2, 4, 1)
-            #
-            #
-            #     # H * Pp * H.t + R
-            #     S = ddot(observation_model, ddot_t_right(prior_covariance, observation_model)) + observation_noise
-            #     invS = dinv(S)
-            #
-            #     # Kalman gain: Pp * H.t * invS
-            #     K = ddot(ddot_t_right(prior_covariance, observation_model), invS)
-            #
-            #     # K * v + mp
-            #     posterior_mean = ddot(K, v) + prior_mean
-            #
-            #     # Pp - K * H * Pp
-            #     posterior_covariance = prior_covariance - ddot(K, ddot(observation_model, prior_covariance))
-            #
-            #     # inv-chi2 test var
-            #     # outlier_test = np.sum(v * ddot(invS, v), axis=0)
-            #     if log_likelihood:
-            #         l = np.ravel(ddot(v.transpose((0,2,1)), ddot(invS, v)))
-            #         l += np.log(np.linalg.det(S))
-            #         l *= -0.5
-            #         return posterior_mean, posterior_covariance, K, l
-            #     else:
-            #         return posterior_mean, posterior_covariance, K
-            #
-            #     return posterior_mean, posterior_covariance
-            #
-            # mo, Po, Ko = simdkalman.primitives.priv_update_with_nan_check(m, P, H_t, R, y)
-            # # m, P, K = _update(m, P, H_t, R, y)
-            # m, P, K = _update(m, P, H_t[np.newaxis,...], R[np.newaxis,...], y)
-
-            # assert np.allclose(mo, m)
-
-            # import pdb; pdb.set_trace()
 
             # forecast of the endog var
             obs_mean, obs_cov = simdkalman.primitives.predict_observation(m, P, H_t, R)
             forecast_mean[:, i, :] = obs_mean[..., 0]
             forecast_cov[:, i, :, :] = obs_cov
 
-            # update
-            m, P, K, l = simdkalman.primitives.priv_update_with_nan_check(
-                m, P, H_t, R, y, log_likelihood=True
+            # update. R matrix is reshaped to be 3d, it's a requirement for the function
+            m, P, K, l = update_with_nan_check(
+                m, P, H_t, R[np.newaxis, ...], y, univariate=self.k_endog == 1
             )
 
             filtered_state_mean[:, i, :] = m[..., 0]
@@ -253,6 +272,7 @@ class RawStructTS(BaseModel):
             predicted_state=predicted_state_mean,
             predicted_state_cov=predicted_state_cov,
             forecast=forecast_mean,
+            forecast_cov=forecast_cov,
             forecast_error_cov=forecast_cov[:, :, 0:1, :],
             forecast_error=(data - forecast_mean),
             llf=llf,
@@ -264,4 +284,78 @@ class RawStructTS(BaseModel):
         raise
 
     def smooth(self):
-        raise
+        filter_result = self.filter()
+
+        data = self.endog
+        single_sequence = len(data.shape) == 1
+        if single_sequence:
+            data = data[np.newaxis, :]
+
+        # ---- Define model
+        A = self.transition  # state_transition
+        Q = self.state_cov  # process_noise
+
+        # ---- Measurement model
+        H = self.design  # observation_model
+        R = self.obs_cov  # observation_noise
+
+        n_vars = data.shape[0]
+        n_measurements = data.shape[1]
+        n_states = self.transition.shape[0]
+        n_obs = self.design.shape[-2]
+
+        smoothed_state_mean = 1 * filter_result.filtered_state
+        smoothed_state_cov = 1 * filter_result.filtered_state_cov
+        smoothed_forecasts_mean = 1 * filter_result.forecast
+        smoothed_forecasts_cov = 1 * filter_result.forecast_cov
+
+        ms = filter_result.filtered_state[:, -1, :][..., np.newaxis]
+        Ps = filter_result.filtered_state_cov[:, -1, :, :]
+
+        for i in range(n_measurements)[-1::-1]:
+
+            # handle time-varying matrices (H for now only)
+            # separate exog for each series
+            if H.ndim == 4:
+                H_t = H[:, i, ...]
+            # common exog for all series
+            elif H.ndim == 3:
+                H_t = H[i][np.newaxis, ...]
+            # no exog
+            elif H.ndim == 2:
+                H_t = H[np.newaxis, ...]
+            else:
+                raise
+
+            obs_mean, obs_cov = simdkalman.primitives.predict_observation(
+                ms, Ps, H_t, R
+            )
+            smoothed_forecasts_mean[:, i, :] = obs_mean[..., 0]
+            smoothed_forecasts_cov[:, i, :, :] = obs_cov
+
+            m0 = filter_result.filtered_state[:, i - 1, :][..., np.newaxis]
+            P0 = filter_result.filtered_state_cov[:, i - 1, :, :]
+
+            if i > 0:
+                ms, Ps, Cs = simdkalman.primitives.priv_smooth(m0, P0, A, Q, ms, Ps)
+
+                smoothed_state_mean[:, i - 1, :] = ms[..., 0]
+                smoothed_state_cov[:, i - 1, :, :] = Ps
+
+        return SmootherResult(
+            smoothed_state=smoothed_state_mean,
+            smoothed_state_cov=smoothed_state_cov,
+            smoothed_forecasts=smoothed_forecasts_mean[..., 0],
+            smoothed_forecasts_cov=smoothed_forecasts_cov[..., 0],
+            filtered_state=filter_result.filtered_state,
+            filtered_state_cov=filter_result.filtered_state_cov,
+            predicted_state=filter_result.predicted_state,
+            predicted_state_cov=filter_result.predicted_state_cov,
+            forecast=filter_result.forecast,
+            forecast_cov=filter_result.forecast_cov,
+            forecast_error_cov=filter_result.forecast_error_cov,
+            forecast_error=filter_result.forecast_error,
+            llf=filter_result.llf,
+            llf_obs=filter_result.llf_obs,
+            model=filter_result.model,
+        )
