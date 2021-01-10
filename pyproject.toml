@@ -7,7 +7,6 @@ authors = [
 ]
 license = "MIT"
 readme = "README.md"
-python = "^3.6"
 homepage = "https://github.com/vshulyak/simd-structts"
 repository = "https://github.com/vshulyak/simd-structts"
 documentation = "https://github.com/vshulyak/simd-structts"
