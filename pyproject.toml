@@ -16,6 +16,7 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
 ]
+include = ["CHANGELOG.md"]
 
 [tool.poetry.urls]
 "Changelog" = "https://github.com/vshulyak/simd-structts/tree/main/CHANGELOG.rst"
@@ -30,7 +31,6 @@ include = '\.pyi?$'
 python = "^3.6"
 statsmodels = "^0.11.1"
 simdkalman = "1.0.1"
-hypothesis = "^5.43.4"
 
 [tool.poetry.dev-dependencies]
 pre-commit = "*"
@@ -45,6 +45,7 @@ twine = "^3.2.0"
 requests = "*"
 tox = "^3.21.0"
 detect-secrets = "^0.14.3"
+hypothesis = "^5.43.4"
 
 [tool.coverage.paths]
 source = ["src"]

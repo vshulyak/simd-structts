@@ -1,7 +1,11 @@
 # simd-structts
+[![pypi](https://img.shields.io/pypi/v/ts-eval)](https://pypi.org/project/simd-structts/)
+[![Build Status](https://travis-ci.org/vshulyak/simd-structts.svg?branch=master)](https://travis-ci.org/vshulyak/simd-structts)
+[![codecov](https://codecov.io/github/vshulyak/simd-structts/branch/master/graph/badge.svg)](https://codecov.io/github/vshulyak/simd-structts)
 [![Python 3.8](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-380/)
-[![Using PyTorch](https://img.shields.io/badge/PyTorch-red.svg)](https://pytorch.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/vshulyak/torch-es/blob/master/LICENSE)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![License: MIT](https://img.shields.io/pypi/l/simd-structts)](https://github.com/vshulyak/simd-structts/blob/master/LICENSE)
+[![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/vshulyak/simd-structts/issues)
 
 Multivariate forecasting using StructTS/Unobserved Components model without MLE param estimation.
 
