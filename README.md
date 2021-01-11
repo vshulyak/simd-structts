@@ -1,12 +1,11 @@
 # simd-structts
-[![pypi](https://img.shields.io/pypi/v/ts-eval)](https://pypi.org/project/simd-structts/)
+[![pypi](https://img.shields.io/pypi/v/simd-structts)](https://pypi.org/project/simd-structts/)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/simd-structts)
 [![Build Status](https://travis-ci.org/vshulyak/simd-structts.svg?branch=master)](https://travis-ci.org/vshulyak/simd-structts)
 [![codecov](https://codecov.io/github/vshulyak/simd-structts/branch/master/graph/badge.svg)](https://codecov.io/github/vshulyak/simd-structts)
-[![Python 3.8](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-380/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![License: MIT](https://img.shields.io/pypi/l/simd-structts)](https://github.com/vshulyak/simd-structts/blob/master/LICENSE)
+[![License: MIT](https://img.shields.io/github/license/vshulyak/simd_structts)](https://github.com/vshulyak/simd-structts/blob/master/LICENSE)
 [![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/vshulyak/simd-structts/issues)
-
 Multivariate forecasting using StructTS/Unobserved Components model without MLE param estimation.
 
 ## 🤦🏾‍ Motivation
@@ -25,8 +24,8 @@ The code in this repo is an attempt to bring a familiar API to multivariate Stru
 ## 📋 WIP:
 - [x] Statsmodels and simdkalman backend implementation.
 - [x] Equal filtered/smoothed/predicted states for level/trend models.
-- [ ] Proper testing for multiple python versions.
-- [ ] Equal filtered/smoothed/predicted states for exog components.
-- [ ] Equal filtered/smoothed/predicted states for long seasonal fourier components.
-- [ ] Passing tests for statsmodels-like initialization of model.
+- [x] Proper testing for multiple python versions.
+- [x] Equal filtered/smoothed/predicted states for exog components.
+- [x] Equal filtered/smoothed/predicted states for long seasonal fourier components.
+- [x] Passing tests for statsmodels-like initialization of model.
 - [ ] Pretty API with ABC and stuff.
