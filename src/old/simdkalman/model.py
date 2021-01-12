@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..base import BaseModel
+from simd_structts.base.model import BaseModel
 from .kalman_filter import EKalmanFilter
 
 
