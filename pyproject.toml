@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "simd_structts"
-version = "0.1.1"
+version = "0.2.0"
 description = "SIMD StuctTS Model with various backends"
 authors = [
     "Vladimir Shulyak <vladimir@shulyak.net>"
