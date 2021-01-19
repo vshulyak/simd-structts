@@ -1,12 +1,7 @@
-from dataclasses import dataclass
-
 import numpy as np
-import simdkalman
-
-from simd_structts.base.model import BaseModel
-from simd_structts.base.results import ForecastResult, FilterResult, SmootherResult
-
-from simdkalman.primitives import ddot, ddot_t_right, dinv
+from simdkalman.primitives import ddot
+from simdkalman.primitives import ddot_t_right
+from simdkalman.primitives import dinv
 
 
 def update_with_nan_check(

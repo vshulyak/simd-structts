@@ -1,18 +1,16 @@
 from dataclasses import dataclass
 
 import numpy as np
-import simdkalman
+from simd_structts.base.results import FilterResult
+from simd_structts.base.results import ForecastResult
+from simd_structts.base.results import SmootherResult
 
-from simd_structts.base.model import BaseModel
-from simd_structts.base.results import ForecastResult, FilterResult, SmootherResult
-
-from .model_definition import ModelDefinition
 from .filter import kalman_filter
+from .model_definition import ModelDefinition
 
 
 @dataclass
 class PySSMFilterResult(FilterResult):
-
     def get_forecast(self, h, exog=None):
 
         if exog is not None:

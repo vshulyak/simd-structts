@@ -2,11 +2,11 @@ import numpy as np
 import pytest
 from simd_structts.backends.simd.model import SIMDStructTS
 from simd_structts.backends.statsmodels.model import MultiUnobservedComponents
-from statsmodels.tsa.statespace.kalman_filter import FILTER_CONVENTIONAL
-from statsmodels.tsa.statespace.kalman_smoother import SMOOTH_CONVENTIONAL
 from simd_structts.test_utils import assert_filters_equal
 from simd_structts.test_utils import assert_forecasts_equal
 from simd_structts.test_utils import assert_smoothers_equal
+from statsmodels.tsa.statespace.kalman_filter import FILTER_CONVENTIONAL
+from statsmodels.tsa.statespace.kalman_smoother import SMOOTH_CONVENTIONAL
 
 N = 366
 H = 30

@@ -2,14 +2,13 @@ from dataclasses import dataclass
 
 import numpy as np
 import simdkalman
-
-from simd_structts.base.model import BaseModel
-from simd_structts.base.results import ForecastResult, FilterResult, SmootherResult
+from simd_structts.base.results import FilterResult
+from simd_structts.base.results import ForecastResult
+from simd_structts.base.results import SmootherResult
 
 
 @dataclass
 class SIMDFilterResult(FilterResult):
-
     def get_forecast(self, h, exog=None):
 
         n_vars = self.model.endog.shape[0]
@@ -79,6 +78,7 @@ class SIMDFilterResult(FilterResult):
             predicted_mean=predicted_mean[..., 0],
             se_mean=np.sqrt(predicted_cov[:, :, 0, 0]),
         )
+
 
 @dataclass
 class SIMDSmootherResult(SIMDFilterResult, SmootherResult):

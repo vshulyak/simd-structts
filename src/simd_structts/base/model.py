@@ -374,7 +374,6 @@ class BaseModel:
 
             i += self.k_exog
 
-
     def filter(self):
         raise NotImplementedError
 

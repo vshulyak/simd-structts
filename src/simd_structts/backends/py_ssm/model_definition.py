@@ -4,7 +4,6 @@ import numpy as np
 
 from .filter import FILTER_CONVENTIONAL
 from .filter import INVERT_UNIVARIATE
-from .filter import kalman_filter
 from .filter import MEMORY_STORE_ALL
 from .filter import SOLVE_CHOLESKY
 from .filter import STABILITY_FORCE_SYMMETRY
