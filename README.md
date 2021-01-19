@@ -29,3 +29,5 @@ The code in this repo is an attempt to bring a familiar API to multivariate Stru
 - [x] Equal filtered/smoothed/predicted states for long seasonal fourier components.
 - [x] Passing tests for statsmodels-like initialization of model.
 - [ ] Pretty API with ABC and stuff.
+- [ ] Example notebook
+- [ ] Gradient methods for finding optimal params

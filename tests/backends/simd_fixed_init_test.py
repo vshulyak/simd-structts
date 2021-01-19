@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
-from simd_structts.backends.simdkalman.model import SIMDStructTS
-from simd_structts.backends.statsmodels import MultiUnobservedComponents
+from simd_structts.backends.simd.model import SIMDStructTS
+from simd_structts.backends.statsmodels.model import MultiUnobservedComponents
 from simd_structts.test_utils import assert_filters_equal
 from simd_structts.test_utils import assert_forecasts_equal
 from simd_structts.test_utils import assert_smoothers_equal
@@ -64,14 +64,12 @@ def test_permute_params(
             ),
         },
     )
-    sm_m.initialize_approx_diffuse(obs_cov=OBS_COV, initial_state_cov=INITIAL_STATE_COV)
+    sm_m.initialize_fixed(initial_state_cov=1e3)
     sm_r = sm_m.smooth()
     sm_preds = sm_r.get_forecast(H, exog=exog_predict)
 
     simd_m = SIMDStructTS(ts1ts2, **kwargs)
-    simd_m.initialize_approx_diffuse(
-        obs_cov=OBS_COV, initial_state_cov=INITIAL_STATE_COV
-    )
+    simd_m.initialize_fixed(initial_state_cov=1e3)
     simd_r = simd_m.smooth()
     simd_preds = simd_r.get_forecast(H, exog=exog_predict)
 

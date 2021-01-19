@@ -1,82 +1,7 @@
 import numpy as np
 from statsmodels.tsa.statespace.structural import UnobservedComponents
 
-
-class SMPredictionResults:
-    def __init__(self, forecasts):
-        self.forecasts = forecasts
-
-    @property
-    def predicted_mean(self):
-        return np.stack([f.predicted_mean for f in self.forecasts])
-
-    @property
-    def se_mean(self):
-        return np.stack([f.se_mean for f in self.forecasts])
-
-
-class SMResults:
-    def __init__(self, res):
-        self.res = res
-
-    def get_forecast(self, horizon, exog=None):
-        return SMPredictionResults(
-            [
-                r.get_forecast(
-                    horizon,
-                    exog=exog[series_idx, ...]
-                    if exog is not None and exog.ndim == 3
-                    else exog,
-                )
-                for series_idx, r in enumerate(self.res)
-            ]
-        )
-
-    @property
-    def filtered_state(self):
-        return np.stack([r.filtered_state.T for r in self.res])
-
-    @property
-    def filtered_state_cov(self):
-        return np.stack([r.filtered_state_cov.T for r in self.res])
-
-    @property
-    def smoothed_state(self):
-        return np.stack([r.smoothed_state.T for r in self.res])
-
-    @property
-    def smoothed_state_cov(self):
-        return np.stack([r.smoothed_state_cov.T for r in self.res])
-
-    @property
-    def smoothed_forecasts(self):
-        return np.stack(
-            [r.filter_results.smoothed_forecasts.T for r in self.res]
-        ).squeeze()
-
-    @property
-    def predicted_state(self):
-        return np.stack([r.predicted_state.T for r in self.res])
-
-    @property
-    def predicted_state_cov(self):
-        return np.stack([r.predicted_state_cov.T for r in self.res])
-
-    @property
-    def forecast(self):
-        return np.stack([r.forecasts.T for r in self.res])
-
-    @property
-    def forecast_error(self):
-        return np.stack([r.forecasts_error.T for r in self.res])
-
-    @property
-    def forecast_error_cov(self):
-        return np.stack([r.forecasts_error_cov.T for r in self.res])
-
-    @property
-    def llf_obs(self):
-        return np.stack([r.llf_obs for r in self.res])
+from .results import SMSmootherResult
 
 
 class MultiUnobservedComponents:
@@ -148,4 +73,23 @@ class MultiUnobservedComponents:
                     cov_kwds=None,
                 )
             ]
-        return SMResults(res)
+
+        return SMSmootherResult(
+            smoothed_state=np.stack([r.smoothed_state.T for r in res]),
+            smoothed_state_cov=np.stack([r.smoothed_state_cov.T for r in res]),
+            smoothed_forecasts=np.stack(
+                [r.filter_results.smoothed_forecasts.T for r in res]
+            ).squeeze(),
+            smoothed_forecasts_cov=None,  # TODO
+            filtered_state=np.stack([r.filtered_state.T for r in res]),
+            filtered_state_cov=np.stack([r.filtered_state_cov.T for r in res]),
+            predicted_state=np.stack([r.predicted_state.T for r in res]),
+            predicted_state_cov=np.stack([r.predicted_state_cov.T for r in res]),
+            forecast=np.stack([r.forecasts.T for r in res]),
+            forecast_cov=None,  # TODO
+            forecast_error_cov=np.stack([r.forecasts_error_cov.T for r in res]),
+            forecast_error=np.stack([r.forecasts_error.T for r in res]),
+            llf=sum([r.llf for r in res]),
+            llf_obs=np.stack([r.llf_obs for r in res]),
+            model=res,
+        )
