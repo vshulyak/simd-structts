@@ -18,7 +18,7 @@ def seasonality(n, s_len=24):
 
 
 def trend(n, steepness=1.2):
-    return np.arange(n) / (n ** steepness) + np.random.rand(n) * 0.1
+    return np.arange(n) / (n**steepness) + np.random.rand(n) * 0.1
 
 
 def create_data(first_date, last_date, level=5, period1=7, period2=365, steepness=0.9):
